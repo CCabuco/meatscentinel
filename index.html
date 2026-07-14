@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeatScentinel — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.2.0/dist/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --c0:#FCF8F8; --c1:#FBEFEF; --c2:#F9DFDF; --c3:#F5AFAF;
+  --ink:#2A1A1A; --ink2:#7A5A5A; --ink3:#B08A8A;
+  --border:#EDD8D8; --white:#fff;
+  --mono:'IBM Plex Mono',monospace; --sans:'Inter',sans-serif;
+}
+body{font-family:var(--sans);background:var(--c0);color:var(--ink);min-height:100vh;
+  display:flex;align-items:center;justify-content:center;padding:32px;-webkit-font-smoothing:antialiased;}
+.wrap{width:100%;max-width:680px;}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+.mark{width:42px;height:42px;background:var(--c3);border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.name{font-size:22px;font-weight:600;letter-spacing:-.3px;}
+.tag{font-size:10px;font-family:var(--mono);color:var(--ink3);letter-spacing:.5px;margin-top:2px;}
+.sub{font-size:13px;color:var(--ink2);line-height:1.65;margin:18px 0 26px;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:600px){.grid{grid-template-columns:1fr;}}
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:20px;
+  text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:8px;
+  transition:border-color .15s, transform .15s, box-shadow .15s;}
+.card:hover{border-color:var(--c3);transform:translateY(-2px);box-shadow:0 6px 18px rgba(42,26,26,.07);}
+.cicon{width:34px;height:34px;border-radius:9px;background:var(--c1);display:flex;align-items:center;justify-content:center;
+  font-size:17px;color:#8F3A3E;margin-bottom:4px;}
+.ctitle{font-size:14px;font-weight:500;}
+.cdesc{font-size:11.5px;color:var(--ink3);line-height:1.6;}
+.cgo{font-size:10px;font-family:var(--mono);color:#8B1A1A;margin-top:6px;display:flex;align-items:center;gap:3px;}
+.foot{margin-top:26px;font-size:10.5px;font-family:var(--mono);color:var(--ink3);line-height:1.7;
+  border-top:1px solid var(--border);padding-top:16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="mark"><i class="ti ti-circles-relation" style="font-size:21px;color:#fff"></i></div>
+    <div>
+      <div class="name">MeatScentinel</div>
+      <div class="tag">interface prototype</div>
+    </div>
+  </div>
+
+  <p class="sub">
+    An IoT-based multi-gas sensing and web application system using a Rule-Based Decision Fusion
+    Algorithm for Fresh and Spoiled classification of raw chicken, beef, and pork.
+    The two interfaces below run on separate devices &mdash; the touchscreen sits on the inspection
+    chamber, while the web application runs in the inspector&rsquo;s browser.
+  </p>
+
+  <div class="grid">
+    <a class="card" href="device.html">
+      <div class="cicon"><i class="ti ti-device-desktop"></i></div>
+      <div class="ctitle">IoT Device &mdash; LCD Touchscreen</div>
+      <div class="cdesc">Sample selection, placement validation, gas detection, gas-based result, upload status, and chamber ventilation.</div>
+      <div class="cgo">Open <i class="ti ti-arrow-right" style="font-size:11px"></i></div>
+    </a>
+
+    <a class="card" href="app.html">
+      <div class="cicon"><i class="ti ti-browser"></i></div>
+      <div class="ctitle">Web Application</div>
+      <div class="cdesc">Inspector login, dashboard, inspection records, review queue, record details with decision fusion, and account.</div>
+      <div class="cgo">Open <i class="ti ti-arrow-right" style="font-size:11px"></i></div>
+    </a>
+  </div>
+
+  <div class="foot">
+    Capstone Project 1 &middot; IT 304 &middot; Technological Institute of the Philippines &ndash; Quezon City<br>
+    Basilio &middot; Batbatan &middot; Cabuco &middot; Tamayo
+  </div>
+</div>
+</body>
+</html>

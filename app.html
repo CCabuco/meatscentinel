@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeatScentinel — Web Application</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.2.0/dist/tabler-icons.min.css">
+<style>
+  :root {
+    --color-background-secondary: #F2ECEC;
+    --color-text-primary: #2A1A1A;
+    --color-text-tertiary: #B08A8A;
+    --border-radius-lg: 18px;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0;
+    background: #FCF8F8;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .backhome {
+    position: fixed; bottom: 16px; left: 16px; z-index: 100;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff; border: 1px solid #EDD8D8; border-radius: 20px;
+    padding: 6px 13px 6px 10px; font-size: 12px; color: #7A5A5A;
+    text-decoration: none; box-shadow: 0 2px 8px rgba(42,26,26,.06);
+  }
+  .backhome:hover { background: #FBEFEF; color: #2A1A1A; }
+</style>
+</head>
+<body>
+<a class="backhome" href="index.html"><i class="ti ti-arrow-left" style="font-size:14px"></i> Back</a>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --c0:#FCF8F8;
+  --c1:#FBEFEF;
+  --c2:#F9DFDF;
+  --c3:#F5AFAF;
+  --ink:#2A1A1A;
+  --ink2:#7A5A5A;
+  --ink3:#B08A8A;
+  --white:#FFFFFF;
+  --border:#EDD8D8;
+  --green:#2D8A5F;
+  --green-bg:#EBF6F0;
+  --amber:#A0600A;
+  --amber-bg:#FBF3E8;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Inter',sans-serif;
+}
+.app{font-family:var(--sans);background:var(--c0);min-height:600px;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid var(--border);}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-dot{width:26px;height:26px;background:var(--c3);border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.logo-name{font-size:14px;font-weight:500;color:var(--ink);letter-spacing:-0.2px;}
+.logo-tag{font-size:10px;color:var(--ink3);font-family:var(--mono);letter-spacing:.4px;}
+.user-wrap{position:relative;}
+.user-chip{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:20px;padding:4px 10px 4px 6px;font-size:12px;color:var(--ink2);cursor:pointer;user-select:none;background:var(--white);transition:background .15s;}
+.user-chip:hover{background:var(--c1);}
+.user-chip.open{background:var(--c1);border-color:var(--c3);}
+.avatar{width:22px;height:22px;border-radius:50%;background:var(--c2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;color:var(--ink);flex-shrink:0;}
+.caret{font-size:13px;color:var(--ink3);transition:transform .15s;}
+.user-chip.open .caret{transform:rotate(180deg);}
+.umenu{display:none;position:absolute;top:calc(100% + 7px);right:0;width:216px;background:var(--white);border:1px solid var(--border);border-radius:11px;box-shadow:0 6px 20px rgba(42,26,26,.10);overflow:hidden;z-index:40;}
+.umenu.show{display:block;}
+.umenu-head{padding:12px 14px;border-bottom:1px solid var(--border);}
+.umenu-name{font-size:13px;font-weight:500;color:var(--ink);}
+.umenu-id{font-size:10px;font-family:var(--mono);color:var(--ink3);margin-top:2px;}
+.umenu-role{font-size:10px;font-family:var(--mono);color:var(--ink3);margin-top:4px;background:var(--c1);display:inline-block;padding:2px 7px;border-radius:20px;}
+.umenu-list{padding:5px;}
+.umenu-item{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:7px;font-size:12.5px;color:var(--ink2);cursor:pointer;}
+.umenu-item:hover{background:var(--c1);color:var(--ink);}
+.umenu-item i{font-size:15px;}
+.umenu-item.danger{color:#8B1A1A;}
+.umenu-item.danger:hover{background:#FBEAEA;}
+.umenu-div{height:1px;background:var(--border);margin:4px 0;}
+.body{display:flex;flex:1;}
+.sidebar{width:196px;background:var(--white);border-right:1px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
+.nav-sec{font-size:9px;font-family:var(--mono);color:var(--ink3);letter-spacing:.8px;padding:14px 10px 6px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--ink2);cursor:pointer;}
+.nav-item:hover{background:var(--c1);}
+.nav-item.on{background:var(--c2);color:var(--ink);font-weight:500;}
+.nav-item i{font-size:15px;}
+.main{flex:1;padding:24px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;}
+.page{display:none;flex-direction:column;gap:18px;}
+.page.show{display:flex;}
+.ph{display:flex;align-items:baseline;gap:10px;margin-bottom:2px;}
+.ptitle{font-size:17px;font-weight:500;color:var(--ink);}
+.psub{font-size:11px;color:var(--ink3);font-family:var(--mono);}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.stat{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.stat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.slabel{font-size:10px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;}
+.sicon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.snum{font-size:30px;font-weight:500;font-family:var(--mono);}
+.sdesc{font-size:11px;color:var(--ink3);margin-top:3px;}
+.sensor-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.scard{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.sch{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.scname{font-size:10px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;}
+.live{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--green);font-family:var(--mono);}
+.ldot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.scval{font-size:30px;font-weight:500;font-family:var(--mono);color:var(--ink);}
+.scunit{font-size:12px;color:var(--ink3);}
+.bar-bg{height:3px;background:var(--c1);border-radius:2px;margin-top:12px;overflow:hidden;}
+.bar-fill{height:3px;border-radius:2px;transition:width 1.2s ease;}
+.bar-labels{display:flex;justify-content:space-between;font-size:9px;font-family:var(--mono);color:var(--ink3);margin-top:4px;}
+.panel{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.phead{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.phead-title{font-size:13px;font-weight:500;color:var(--ink);}
+.tab-row{display:flex;gap:0;}
+.tab{font-size:11px;font-family:var(--mono);padding:6px 12px;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;}
+.tab.on{color:var(--ink);border-bottom-color:var(--c3);}
+.fpills{display:flex;gap:6px;}
+.filterbar{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--c0);}
+.fgroup{display:flex;align-items:center;gap:5px;}
+.fglabel{font-size:9px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;}
+.fsel{font-size:11px;font-family:var(--sans);color:var(--ink);background:var(--white);border:1px solid var(--border);border-radius:7px;padding:4px 7px;outline:none;cursor:pointer;}
+.fsel:focus{border-color:var(--c3);}
+.fdate{font-size:11px;font-family:var(--mono);color:var(--ink2);background:var(--white);border:1px solid var(--border);border-radius:7px;padding:4px 7px;outline:none;cursor:pointer;}
+.fdate:focus{border-color:var(--c3);}
+.fclear{font-size:10px;font-family:var(--mono);color:var(--c3);cursor:pointer;margin-left:auto;background:none;border:none;padding:4px;}
+.fclear:hover{color:#8B1A1A;}
+.pill{font-size:10px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--ink3);cursor:pointer;background:transparent;}
+.pill.on{background:var(--c2);border-color:var(--c3);color:var(--ink);}
+.rtable{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
+.rtable th{padding:8px 14px;text-align:left;color:var(--ink3);font-weight:400;font-family:var(--mono);font-size:9px;letter-spacing:.4px;border-bottom:1px solid var(--border);}
+.rtable td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--ink);vertical-align:middle;}
+.rtable tr:last-child td{border-bottom:none;}
+.rtable tr:hover td{background:var(--c0);}
+.mono{font-family:var(--mono);font-size:11px;color:var(--ink3);}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-family:var(--mono);}
+.b-fresh{background:var(--green-bg);color:var(--green);}
+.b-spoiled{background:var(--c2);color:#8B1A1A;}
+.b-review{background:var(--amber-bg);color:var(--amber);}
+.b-pend{background:var(--c1);color:var(--ink3);}
+.bdot{width:4px;height:4px;border-radius:50%;}
+.viewlink{font-size:11px;font-family:var(--mono);color:var(--c3);cursor:pointer;display:flex;align-items:center;gap:2px;}
+.viewlink:hover{color:#8B1A1A;}
+.backlink{font-size:11px;font-family:var(--mono);color:var(--ink3);cursor:pointer;display:flex;align-items:center;gap:4px;}
+.backlink:hover{color:var(--ink);}
+.det-grid{display:grid;grid-template-columns:1fr 1fr;}
+.det-cell{padding:11px 18px;border-bottom:1px solid var(--border);}
+.det-cell:nth-child(odd){border-right:1px solid var(--border);}
+.det-label{font-size:9px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;margin-bottom:3px;}
+.det-val{font-size:12px;color:var(--ink);}
+.det-val.m{font-family:var(--mono);}
+.fusion{margin:16px 18px;background:var(--c0);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.fusion-label{font-size:9px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;margin-bottom:12px;}
+.frow{display:flex;align-items:center;gap:12px;margin-bottom:8px;font-size:12px;}
+.frule{font-size:10px;font-family:var(--mono);color:var(--ink3);margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.ffinal{display:flex;justify-content:space-between;align-items:center;padding-top:8px;}
+.ffkey{font-size:9px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;}
+.ffval{font-size:14px;font-weight:500;font-family:var(--mono);}
+.remarks-area{margin:0 18px 16px;}
+.rem-label{font-size:9px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;margin-bottom:8px;}
+.rem-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.rem-item:last-child{border-bottom:none;}
+.rem-time{font-size:10px;font-family:var(--mono);color:var(--ink3);white-space:nowrap;flex-shrink:0;padding-top:1px;}
+.rem-text{font-size:12px;color:var(--ink);line-height:1.5;}
+.notif{background:var(--amber-bg);border:1px solid #E8C97A;border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;font-size:12px;}
+.notif i{color:var(--amber);font-size:16px;}
+.btn-xs{font-size:10px;font-family:var(--mono);padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--white);color:var(--ink2);cursor:pointer;}
+.btn-xs:hover{background:var(--c1);}
+.img-thumb{width:44px;height:44px;border-radius:8px;background:var(--c1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:560px;padding:24px;}
+.login-box{width:340px;display:flex;flex-direction:column;gap:0;}
+.login-card{background:var(--white);border:1px solid var(--border);border-radius:16px;padding:30px 28px 26px;}
+.login-brand{text-align:center;margin-bottom:26px;}
+.login-icon{width:46px;height:46px;background:var(--c3);border-radius:13px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
+.field{margin-bottom:13px;}
+.field-label{font-size:10px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
+.field-wrap{position:relative;display:flex;align-items:center;}
+.field input{width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:var(--sans);color:var(--ink);background:var(--c0);outline:none;transition:border-color .15s;}
+.field input:focus{border-color:var(--c3);background:var(--white);}
+.field input.err{border-color:#C97070;background:#FDF6F6;}
+.field input.mono-in{font-family:var(--mono);letter-spacing:.3px;}
+.peek{position:absolute;right:9px;background:none;border:none;color:var(--ink3);cursor:pointer;padding:4px;display:flex;font-size:15px;}
+.peek:hover{color:var(--ink2);}
+.ferr{font-size:10px;font-family:var(--mono);color:#8B1A1A;margin-top:5px;display:none;}
+.ferr.show{display:block;}
+.login-alert{display:none;align-items:flex-start;gap:8px;background:#FBEAEA;border:1px solid #E8B4B4;border-radius:9px;padding:9px 11px;margin-bottom:16px;font-size:11.5px;color:#8B1A1A;line-height:1.5;}
+.login-alert.show{display:flex;}
+.forgot{font-size:10px;font-family:var(--mono);color:var(--c3);cursor:pointer;text-transform:none;letter-spacing:0;}
+.forgot:hover{color:#8B1A1A;}
+
+.btn-primary{width:100%;background:var(--c3);border:none;border-radius:8px;padding:10px;color:var(--ink);font-size:13px;font-weight:500;cursor:pointer;margin-top:4px;font-family:var(--sans);}
+.btn-primary:hover{background:#F09090;}
+.login-note{text-align:center;font-size:10px;font-family:var(--mono);color:var(--ink3);margin-top:14px;}
+.hist-wrap{margin:0 18px 16px;border-left:1.5px solid var(--border);padding-left:16px;display:flex;flex-direction:column;gap:0;}
+.hist-item{position:relative;padding:6px 0;font-size:12px;}
+.hist-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--c3);position:absolute;left:-19.5px;top:10px;}
+.hist-time{font-size:10px;font-family:var(--mono);color:var(--ink3);margin-bottom:2px;}
+
+/* --- added: device health, pagination, override modal, review queue, empty states --- */
+.hlabel{font-size:9px;font-family:var(--mono);color:var(--ink3);letter-spacing:.4px;}
+.why{font-size:10px;font-family:var(--mono);color:var(--ink3);margin-top:3px;}
+.pager{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--border);}
+.pager-info{font-size:11px;font-family:var(--mono);color:var(--ink3);}
+.pager-btns{display:flex;gap:6px;}
+.pbtn{font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--white);color:var(--ink2);cursor:pointer;}
+.pbtn:hover:not(:disabled){background:var(--c1);}
+.pbtn:disabled{opacity:.4;cursor:not-allowed;}
+.pbtn.on{background:var(--c2);border-color:var(--c3);color:var(--ink);}
+.empty{padding:34px 18px;text-align:center;}
+.empty-icon{font-size:26px;color:var(--ink3);margin-bottom:8px;}
+.empty-title{font-size:13px;color:var(--ink);font-weight:500;margin-bottom:4px;}
+.empty-sub{font-size:11px;color:var(--ink3);font-family:var(--mono);line-height:1.6;}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(42,26,26,.34);align-items:center;justify-content:center;z-index:50;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--white);border-radius:14px;width:390px;max-width:92vw;border:1px solid var(--border);overflow:hidden;}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;font-weight:500;color:var(--ink);}
+.modal-body{padding:16px 18px;}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.ta{width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:12px;font-family:var(--sans);color:var(--ink);background:var(--c0);outline:none;resize:vertical;min-height:76px;}
+.ta:focus{border-color:var(--c3);}
+.req{font-size:10px;font-family:var(--mono);color:#8B1A1A;margin-top:5px;display:none;}
+.req.show{display:block;}
+.ovr-opts{display:flex;gap:6px;margin-bottom:12px;}
+.ovr{flex:1;text-align:center;font-size:11px;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--white);color:var(--ink2);cursor:pointer;font-family:var(--mono);}
+.ovr.on{background:var(--c2);border-color:var(--c3);color:var(--ink);font-weight:500;}
+.btn-solid{background:var(--c3);border:none;border-radius:8px;padding:8px 16px;color:var(--ink);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--sans);}
+.btn-solid:hover{background:#F09090;}
+.btn-plain{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--ink2);font-size:12px;cursor:pointer;font-family:var(--sans);}
+.sec-note{font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:-6px;}
+.nav-badge{margin-left:auto;font-size:9px;font-family:var(--mono);background:var(--amber-bg);color:var(--amber);padding:1px 6px;border-radius:20px;}
+</style>
+
+<div class="app">
+  <div class="topbar" id="topbar" style="display:none">
+    <div class="logo">
+      <div class="logo-dot"><i class="ti ti-circles-relation" style="font-size:14px;color:#fff" aria-hidden="true"></i></div>
+      <div>
+        <div class="logo-name">MeatScentinel</div>
+        <div class="logo-tag">inspection system</div>
+      </div>
+    </div>
+    <div class="user-wrap">
+      <div class="user-chip" id="userChip" onclick="toggleUserMenu(event)">
+        <div class="avatar">MR</div>
+        <span>Insp. Reyes</span>
+        <i class="ti ti-chevron-down caret" aria-hidden="true"></i>
+      </div>
+      <div class="umenu" id="userMenu">
+        <div class="umenu-head">
+          <div class="umenu-name">Insp. M. Reyes</div>
+          <div class="umenu-id">INS-2024-007</div>
+          <div class="umenu-role">Meat Control Officer</div>
+        </div>
+        <div class="umenu-list">
+          <div class="umenu-item" onclick="goProfile()"><i class="ti ti-user" aria-hidden="true"></i>Profile &amp; account</div>
+          <div class="umenu-div"></div>
+          <div class="umenu-item danger" onclick="signOut()"><i class="ti ti-logout" aria-hidden="true"></i>Sign out</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="sidebar" id="sidebar" style="display:none">
+      <div class="nav-sec">main</div>
+      <div class="nav-item on" onclick="nav('dashboard',0)"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Dashboard</div>
+      <div class="nav-item" onclick="nav('records',1)"><i class="ti ti-file-text" aria-hidden="true"></i>Records</div>
+      <div class="nav-item" onclick="nav('review',2)"><i class="ti ti-alert-triangle" aria-hidden="true"></i>For review<span class="nav-badge">5</span></div>
+
+    </div>
+
+    <div class="main">
+
+      <div class="page" id="p-dashboard">
+        <div>
+          <div class="ph"><span class="ptitle">Dashboard</span></div>
+          <div class="psub">Jun 17, 2026 · 09:42</div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat">
+            <div class="stat-top">
+              <div class="slabel">fresh</div>
+              <div class="sicon" style="background:var(--green-bg)"><i class="ti ti-check" style="color:var(--green)" aria-hidden="true"></i></div>
+            </div>
+            <div class="snum" style="color:var(--green)" id="cnt-f">47</div>
+            <div class="sdesc">↑ 3 from yesterday</div>
+          </div>
+          <div class="stat">
+            <div class="stat-top">
+              <div class="slabel">spoiled</div>
+              <div class="sicon" style="background:var(--c2)"><i class="ti ti-x" style="color:#8B1A1A" aria-hidden="true"></i></div>
+            </div>
+            <div class="snum" style="color:#8B1A1A" id="cnt-s">12</div>
+            <div class="sdesc">↓ 1 from yesterday</div>
+          </div>
+          <div class="stat">
+            <div class="stat-top">
+              <div class="slabel">for review</div>
+              <div class="sicon" style="background:var(--amber-bg)"><i class="ti ti-alert-triangle" style="color:var(--amber)" aria-hidden="true"></i></div>
+            </div>
+            <div class="snum" style="color:var(--amber)" id="cnt-r">5</div>
+            <div class="sdesc">Awaiting inputs</div>
+          </div>
+        </div>
+
+        <div class="sensor-grid">
+          <div class="scard">
+            <div class="sch">
+              <div class="scname">nh₃ — ammonia</div>
+              <div class="live"><div class="ldot"></div>live</div>
+            </div>
+            <div><span class="scval" id="nh3">18.4</span><span class="scunit"> ppm</span></div>
+            <div class="bar-bg"><div class="bar-fill" id="nh3-b" style="width:37%;background:var(--green)"></div></div>
+            <div class="bar-labels"><span>0</span><span style="color:var(--amber)">thresh 25</span><span>50</span></div>
+          </div>
+          <div class="scard">
+            <div class="sch">
+              <div class="scname">h₂s — hydrogen sulphide</div>
+              <div class="live"><div class="ldot"></div>live</div>
+            </div>
+            <div><span class="scval" id="h2s">6.1</span><span class="scunit"> ppm</span></div>
+            <div class="bar-bg"><div class="bar-fill" id="h2s-b" style="width:30%;background:var(--amber)"></div></div>
+            <div class="bar-labels"><span>0</span><span style="color:var(--amber)">thresh 10</span><span>20</span></div>
+          </div>
+        </div>
+
+        <div class="notif">
+          <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+          <div style="color:var(--ink2)"><strong>5 records</strong> need review — missing images or unmatched IoT submissions. <span style="color:#8B1A1A;cursor:pointer;font-weight:500" onclick="nav('review',2)">View queue →</span></div>
+        </div>
+      </div>
+
+      <div class="page" id="p-records">
+        <div>
+          <div class="ph"><span class="ptitle">Inspection records</span></div>
+          <div class="psub">all sources · 64 total</div>
+        </div>
+
+        <div class="panel">
+          <div class="phead">
+            <div class="tab-row">
+              <div class="tab on">All</div>
+              <div class="tab">IoT gas</div>
+              <div class="tab">Mobile app</div>
+              <div class="tab">Paired</div>
+              <div class="tab">Pending</div>
+            </div>
+            <div class="fpills">
+              <div class="pill on">All</div>
+              <div class="pill">Fresh</div>
+              <div class="pill">Spoiled</div>
+              <div class="pill">Review</div>
+            </div>
+          </div>
+
+          <div class="filterbar">
+            <div class="fgroup">
+              <span class="fglabel">sample type</span>
+              <select class="fsel">
+                <option>All</option>
+                <option>Chicken</option>
+                <option>Pork</option>
+                <option>Beef</option>
+              </select>
+            </div>
+            <div class="fgroup">
+              <span class="fglabel">case status</span>
+              <select class="fsel">
+                <option>All</option>
+                <option>Open</option>
+                <option>Re-test</option>
+                <option>Closed</option>
+              </select>
+            </div>
+            <div class="fgroup">
+              <span class="fglabel">date</span>
+              <input type="date" class="fdate" value="2026-06-17">
+            </div>
+            <button class="fclear">clear filters</button>
+          </div>
+
+          <table class="rtable">
+            <thead>
+              <tr>
+                <th style="width:130px">ID</th>
+                <th style="width:80px">Sample</th>
+                <th style="width:80px">NH₃ avg</th>
+                <th style="width:80px">H₂S avg</th>
+                <th style="width:80px">Gas</th>
+                <th style="width:80px">Image</th>
+                <th style="width:90px">Classification</th>
+                <th style="width:70px">Status</th>
+                <th style="width:90px">Date</th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">MSC-2026-0841</td>
+                <td>Beef</td>
+                <td class="mono">14.2 ppm</td>
+                <td class="mono">4.8 ppm</td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-pend">Closed</span></td>
+                <td class="mono">Jun 17, 09:31</td>
+                <td><div class="viewlink" onclick="openDetail()">View <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0840</td>
+                <td>Pork</td>
+                <td class="mono">38.7 ppm</td>
+                <td class="mono">13.2 ppm</td>
+                <td><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span></td>
+                <td><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span></td>
+                <td><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span><div class="why">both agree</div></td>
+                <td><span class="badge b-pend">Closed</span></td>
+                <td class="mono">Jun 17, 09:18</td>
+                <td><div class="viewlink" onclick="openDetail()">View <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0839</td>
+                <td>Chicken</td>
+                <td class="mono">21.1 ppm</td>
+                <td class="mono">7.5 ppm</td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span></td>
+                <td><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span><div class="why">image override</div></td>
+                <td><span class="badge b-review">Open</span></td>
+                <td class="mono">Jun 17, 08:55</td>
+                <td><div class="viewlink" onclick="openDetail()">View <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0838</td>
+                <td>Pork</td>
+                <td class="mono">—</td>
+                <td class="mono">—</td>
+                <td><span class="badge b-pend">Pending</span></td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-review"><span class="bdot" style="background:var(--amber)"></span>For review</span><div class="why">gas record missing</div></td>
+                <td><span class="badge b-review">Re-test</span></td>
+                <td class="mono">Jun 17, 08:40</td>
+                <td><div class="viewlink" onclick="openDetail()">View <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0837</td>
+                <td>Beef</td>
+                <td class="mono">11.0 ppm</td>
+                <td class="mono">3.3 ppm</td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></td>
+                <td><span class="badge b-pend">Closed</span></td>
+                <td class="mono">Jun 17, 08:22</td>
+                <td><div class="viewlink" onclick="openDetail()">View <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pager">
+            <div class="pager-info">1&ndash;5 of 64</div>
+            <div class="pager-btns">
+              <button class="pbtn" disabled>Prev</button>
+              <button class="pbtn on">1</button>
+              <button class="pbtn">2</button>
+              <button class="pbtn">3</button>
+              <button class="pbtn">&hellip;</button>
+              <button class="pbtn">13</button>
+              <button class="pbtn">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FIX 11 + 12: dedicated For Review queue with age tracking + SOP copy -->
+      <div class="page" id="p-review">
+        <div>
+          <div class="ph"><span class="ptitle">For review</span></div>
+          <div class="psub">5 records awaiting resolution</div>
+        </div>
+
+        <div class="panel">
+          <div class="phead">
+            <div class="tab-row">
+              <div class="tab on">All</div>
+              <div class="tab">Invalid reading</div>
+              <div class="tab">Unmatched pairing</div>
+            </div>
+            <div class="fpills">
+              <div class="pill on">All</div>
+              <div class="pill">Chicken</div>
+              <div class="pill">Pork</div>
+              <div class="pill">Beef</div>
+            </div>
+          </div>
+          <table class="rtable">
+            <thead>
+              <tr>
+                <th style="width:130px">ID</th>
+                <th style="width:75px">Sample</th>
+                <th style="width:170px">Reason</th>
+                <th style="width:120px">Date</th>
+                <th style="width:110px">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">MSC-2026-0838</td>
+                <td>Pork</td>
+                <td><span class="badge b-review"><span class="bdot" style="background:var(--amber)"></span>Unmatched</span><div class="why">no IoT gas record</div></td>
+                <td class="mono">Jun 17, 08:40</td>
+                <td><div class="viewlink" onclick="openDetail()">Resolve <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0834</td>
+                <td>Chicken</td>
+                <td><span class="badge b-review"><span class="bdot" style="background:var(--amber)"></span>Invalid</span><div class="why">unstable H&#8322;S reading</div></td>
+                <td class="mono">Jun 17, 03:12</td>
+                <td><div class="viewlink" onclick="openDetail()">Resolve <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0829</td>
+                <td>Beef</td>
+                <td><span class="badge b-review"><span class="bdot" style="background:var(--amber)"></span>Invalid</span><div class="why">NH&#8323; sensor timeout</div></td>
+                <td class="mono">Jun 16, 10:04</td>
+                <td><div class="viewlink" onclick="openDetail()">Resolve <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0817</td>
+                <td>Pork</td>
+                <td><span class="badge b-review"><span class="bdot" style="background:var(--amber)"></span>Unmatched</span><div class="why">no mobile image result</div></td>
+                <td class="mono">Jun 15, 06:33</td>
+                <td><div class="viewlink" onclick="openDetail()">Resolve <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+              <tr>
+                <td class="mono">MSC-2026-0805</td>
+                <td>Chicken</td>
+                <td><span class="badge b-review"><span class="bdot" style="background:var(--amber)"></span>Invalid</span><div class="why">incomplete gas cycle</div></td>
+                <td class="mono">Jun 14, 11:50</td>
+                <td><div class="viewlink" onclick="openDetail()">Resolve <i class="ti ti-chevron-right" style="font-size:11px"></i></div></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pager">
+            <div class="pager-info">5 records in review</div>
+            <div class="pager-btns">
+              <button class="pbtn" disabled>Prev</button>
+              <button class="pbtn on">1</button>
+              <button class="pbtn" disabled>Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="p-detail">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="backlink" onclick="nav('records',1)"><i class="ti ti-arrow-left"></i>Records</div>
+          <span style="color:var(--border)">·</span>
+          <span class="ptitle" style="font-size:15px">MSC-2026-0839</span>
+          <span class="badge b-spoiled" style="margin-left:auto"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span>
+        </div>
+
+        <div class="panel">
+          <div class="phead">
+            <div class="phead-title">Inspection details</div>
+            <span class="badge b-pend">Chicken · Breast cut</span>
+          </div>
+          <div class="det-grid">
+            <div class="det-cell"><div class="det-label">inspection id</div><div class="det-val m">MSC-2026-0839</div></div>
+            <div class="det-cell"><div class="det-label">sample type</div><div class="det-val">Raw chicken</div></div>
+            <div class="det-cell"><div class="det-label">source type</div><div class="det-val">IoT + Mobile app (Paired)</div></div>
+            <div class="det-cell"><div class="det-label">case status</div><div class="det-val" id="caseStatusVal"><span class="badge b-review">Open</span></div></div>
+            <div class="det-cell"><div class="det-label">avg nh₃ reading</div><div class="det-val m" style="color:var(--green)">21.1 ppm</div></div>
+            <div class="det-cell"><div class="det-label">avg h₂s reading</div><div class="det-val m" style="color:var(--green)">7.5 ppm</div></div>
+            <div class="det-cell"><div class="det-label">gas-based result</div><div class="det-val"><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></div></div>
+            <div class="det-cell"><div class="det-label">image-based result</div><div class="det-val"><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span></div></div>
+            <div class="det-cell"><div class="det-label">final classification</div><div class="det-val"><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span></div></div>
+            <div class="det-cell"><div class="det-label">date & time</div><div class="det-val m">Jun 17, 2026 · 08:55:14</div></div>
+            <div class="det-cell" style="border-bottom:none"><div class="det-label">remarks</div><div class="det-val" id="remarkCount">1 remark logged</div></div>
+            <div class="det-cell" style="border-bottom:none">
+              <div class="det-label">submitted image</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+                <div class="img-thumb"><i class="ti ti-photo" style="font-size:18px;color:var(--ink3)" aria-hidden="true"></i></div>
+                <span style="font-size:11px;font-family:var(--mono);color:#8B1A1A;cursor:pointer">chicken_0839.jpg <i class="ti ti-download" style="font-size:11px"></i></span>
+              </div>
+            </div>
+          </div>
+          <div class="fusion">
+            <div class="fusion-label">rule-based decision fusion</div>
+            <div class="frow"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);width:110px">Gas result</span><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Fresh</span></div>
+            <div class="frow"><span style="font-family:var(--mono);font-size:11px;color:var(--ink3);width:110px">Image result</span><span class="badge b-spoiled"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span></div>
+            <div class="frule">Rule applied — either result = Spoiled → classify as Spoiled</div>
+            <div class="ffinal">
+              <div>
+                <div class="ffkey">final classification</div>
+                <div class="why" id="ovrNote">system-generated</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="ffval" id="finalVal" style="color:#8B1A1A">Spoiled</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="phead">
+            <div class="phead-title">Remarks & status history</div>
+            <button class="btn-xs" onclick="openRemark()"><i class="ti ti-plus" style="font-size:11px"></i> Add remark</button>
+          </div>
+          <div style="height:12px"></div>
+          <div class="hist-wrap">
+            <div class="hist-item"><div class="hist-time">08:55</div><div style="color:var(--ink2)">Record created — IoT submission received</div></div>
+            <div class="hist-item"><div class="hist-time">08:57</div><div>Mobile image paired · Status set to <span class="badge b-spoiled" style="font-size:10px"><span class="bdot" style="background:#8B1A1A"></span>Spoiled</span></div></div>
+            <div class="hist-item"><div class="hist-time">09:01</div><div>"Sample flagged for disposal. Odor confirmed on physical check." — Insp. Reyes</div></div>
+          </div>
+          <div style="height:4px"></div>
+        </div>
+      </div>
+
+      <div class="page" id="p-profile">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="backlink" onclick="nav('dashboard',0)"><i class="ti ti-arrow-left"></i>Dashboard</div>
+          <span style="color:var(--border)">&middot;</span>
+          <span class="ptitle" style="font-size:15px">Profile &amp; account</span>
+        </div>
+
+        <div class="panel">
+          <div class="phead">
+            <div class="phead-title">Account information</div>
+            <button class="btn-xs"><i class="ti ti-edit" style="font-size:11px"></i> Edit details</button>
+          </div>
+          <div class="det-grid">
+            <div class="det-cell"><div class="det-label">inspector id</div><div class="det-val m">INS-2024-007</div></div>
+            <div class="det-cell"><div class="det-label">full name</div><div class="det-val">Insp. M. Reyes</div></div>
+            <div class="det-cell"><div class="det-label">role</div><div class="det-val">Meat Control Officer</div></div>
+            <div class="det-cell"><div class="det-label">assigned office</div><div class="det-val">NMIS &ndash; RTOC III</div></div>
+            <div class="det-cell" style="border-bottom:none"><div class="det-label">email</div><div class="det-val m">m.reyes@nmis.gov.ph</div></div>
+            <div class="det-cell" style="border-bottom:none"><div class="det-label">account status</div><div class="det-val"><span class="badge b-fresh"><span class="bdot" style="background:var(--green)"></span>Active</span></div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="phead">
+            <div class="phead-title">Security</div>
+          </div>
+          <div class="det-grid">
+            <div class="det-cell" style="border-bottom:none"><div class="det-label">password</div><div class="det-val m">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div></div>
+            <div class="det-cell" style="border-bottom:none">
+              <div class="det-label">actions</div>
+              <div style="margin-top:5px;display:flex;gap:6px">
+                <button class="btn-xs">Change password</button>
+                <button class="btn-xs" onclick="signOut()">Sign out</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page show" id="p-login">
+        <div class="login-wrap">
+          <div class="login-box">
+            <div class="login-card">
+              <div class="login-brand">
+                <div class="login-icon"><i class="ti ti-circles-relation" style="font-size:23px;color:#fff" aria-hidden="true"></i></div>
+                <div style="font-size:17px;font-weight:500;color:var(--ink)">MeatScentinel</div>
+                <div style="font-size:10px;font-family:var(--mono);color:var(--ink3);margin-top:4px;letter-spacing:.4px">inspector portal</div>
+              </div>
+
+              <div class="login-alert" id="loginAlert">
+                <i class="ti ti-alert-circle" style="font-size:14px;flex-shrink:0;margin-top:1px" aria-hidden="true"></i>
+                <div id="loginAlertText">Invalid inspector ID or password.</div>
+              </div>
+
+              <div class="field">
+                <div class="field-label"><span>inspector id</span></div>
+                <div class="field-wrap">
+                  <input type="text" id="inspId" class="mono-in" placeholder="INS-0000-000" autocomplete="username">
+                </div>
+                <div class="ferr" id="idErr">Inspector ID is required.</div>
+              </div>
+
+              <div class="field">
+                <div class="field-label">
+                  <span>password</span>
+                  <span class="forgot" onclick="forgotPw()">forgot?</span>
+                </div>
+                <div class="field-wrap">
+                  <input type="password" id="inspPw" placeholder="Enter your password" autocomplete="current-password">
+                  <button class="peek" id="peekBtn" onclick="togglePw()" aria-label="Show password"><i class="ti ti-eye" id="peekIcon" aria-hidden="true"></i></button>
+                </div>
+                <div class="ferr" id="pwErr">Password is required.</div>
+              </div>
+
+              <button class="btn-primary" id="signInBtn" onclick="doSignIn()">Sign in</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="ovrModal">
+  <div class="modal">
+    <div class="modal-head">Update case status</div>
+    <div class="modal-body">
+      <div class="hlabel" style="margin-bottom:7px">case status</div>
+      <div class="ovr-opts">
+        <div class="ovr on" data-v="Open" onclick="pickOvr(this)">Open</div>
+        <div class="ovr" data-v="Re-test" onclick="pickOvr(this)">Re-test</div>
+        <div class="ovr" data-v="Closed" onclick="pickOvr(this)">Closed</div>
+      </div>
+      <div class="hlabel" style="margin-bottom:7px">remark <span style="color:#8B1A1A">(required)</span></div>
+      <textarea class="ta" id="ovrText" placeholder="Basis for the status change (e.g. physical check confirmed, sample re-tested)."></textarea>
+      <div class="req" id="ovrReq">A remark is required when changing case status.</div>
+      <div class="sec-note" style="margin-top:9px">Recorded in status history with your inspector ID. Previous entries are not deleted.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-plain" onclick="closeModal('ovrModal')">Cancel</button>
+      <button class="btn-solid" onclick="submitOverride()">Save status</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="remModal">
+  <div class="modal">
+    <div class="modal-head">Add inspector remark</div>
+    <div class="modal-body">
+      <textarea class="ta" id="remText" placeholder="Add a remark for this inspection record."></textarea>
+      <div class="req" id="remReq">Remark cannot be empty.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-plain" onclick="closeModal('remModal')">Cancel</button>
+      <button class="btn-solid" onclick="submitRemark()">Add remark</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ovrChoice = 'Open';
+
+function openStatus(){ document.getElementById('ovrModal').classList.add('show'); }
+function openRemark(){ document.getElementById('remModal').classList.add('show'); }
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+  document.getElementById('ovrReq').classList.remove('show');
+  document.getElementById('remReq').classList.remove('show');
+}
+function pickOvr(el){
+  document.querySelectorAll('.ovr').forEach(function(o){ o.classList.remove('on'); });
+  el.classList.add('on');
+  ovrChoice = el.getAttribute('data-v');
+}
+function nowTime(){
+  var d = new Date();
+  return ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+}
+function addHistory(html){
+  var wrap = document.querySelector('.hist-wrap');
+  var item = document.createElement('div');
+  item.className = 'hist-item';
+  item.innerHTML = '<div class="hist-time">' + nowTime() + '</div><div>' + html + '</div>';
+  wrap.appendChild(item);
+}
+var remarkCount = 1;
+
+function statusBadgeClass(v){
+  if (v === 'Closed') return 'b-pend';
+  if (v === 'Re-test') return 'b-review';
+  return 'b-review';
+}
+
+function submitOverride(){
+  var txt = document.getElementById('ovrText').value.trim();
+  if(!txt){ document.getElementById('ovrReq').classList.add('show'); return; }
+  // reflect the new case status in the details grid
+  var cell = document.getElementById('caseStatusVal');
+  if (cell) {
+    cell.innerHTML = '<span class="badge ' + statusBadgeClass(ovrChoice) + '">' + ovrChoice + '</span>';
+  }
+  addHistory('Case status set to <strong>' + ovrChoice + '</strong> &mdash; "' + txt + '" &mdash; Insp. Reyes');
+  bumpRemarks();
+  document.getElementById('ovrText').value = '';
+  closeModal('ovrModal');
+}
+
+function bumpRemarks(){
+  remarkCount++;
+  var rc = document.getElementById('remarkCount');
+  if (rc) rc.textContent = remarkCount + (remarkCount === 1 ? ' remark logged' : ' remarks logged');
+}
+function submitRemark(){
+  var txt = document.getElementById('remText').value.trim();
+  if(!txt){ document.getElementById('remReq').classList.add('show'); return; }
+  addHistory('"' + txt + '" &mdash; Insp. Reyes');
+  bumpRemarks();
+  document.getElementById('remText').value = '';
+  closeModal('remModal');
+}
+
+function nav(id, idx) {
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('show'); });
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('on'); });
+  document.getElementById('p-' + id).classList.add('show');
+  if (idx !== undefined && idx !== null) {
+    var items = document.querySelectorAll('.nav-item');
+    if (items[idx]) items[idx].classList.add('on');
+  }
+  // login is a gate: hide the whole app shell
+  var authed = (id !== 'login');
+  document.getElementById('topbar').style.display = authed ? 'flex' : 'none';
+  document.getElementById('sidebar').style.display = authed ? 'flex' : 'none';
+  closeUserMenu();
+  if (!authed) { resetLogin(); }
+  document.querySelector('.main').scrollTop = 0;
+}
+
+/* detail + profile are reached contextually, not from the sidebar */
+function openDetail(){ nav('detail', null); }
+function goProfile(){ nav('profile', null); }
+
+/* ---------- user menu ---------- */
+function toggleUserMenu(e){
+  e.stopPropagation();
+  document.getElementById('userMenu').classList.toggle('show');
+  document.getElementById('userChip').classList.toggle('open');
+}
+function closeUserMenu(){
+  document.getElementById('userMenu').classList.remove('show');
+  document.getElementById('userChip').classList.remove('open');
+}
+document.addEventListener('click', closeUserMenu);
+
+function signOut(){
+  document.getElementById('inspId').value = '';
+  document.getElementById('inspPw').value = '';
+  nav('login', null);
+}
+
+/* ---------- login ---------- */
+function resetLogin(){
+  document.getElementById('loginAlert').classList.remove('show');
+  document.getElementById('idErr').classList.remove('show');
+  document.getElementById('pwErr').classList.remove('show');
+  document.getElementById('inspId').classList.remove('err');
+  document.getElementById('inspPw').classList.remove('err');
+}
+
+function togglePw(){
+  var pw = document.getElementById('inspPw');
+  var ic = document.getElementById('peekIcon');
+  if (pw.type === 'password') {
+    pw.type = 'text';
+    ic.className = 'ti ti-eye-off';
+  } else {
+    pw.type = 'password';
+    ic.className = 'ti ti-eye';
+  }
+}
+
+function forgotPw(){
+  showLoginAlert('Password resets are issued by your supervising Meat Control Officer.');
+}
+
+function showLoginAlert(msg){
+  document.getElementById('loginAlertText').textContent = msg;
+  document.getElementById('loginAlert').classList.add('show');
+}
+
+function doSignIn(){
+  resetLogin();
+  var idEl = document.getElementById('inspId');
+  var pwEl = document.getElementById('inspPw');
+  var id = idEl.value.trim();
+  var pw = pwEl.value;
+  var bad = false;
+
+  if (!id) { document.getElementById('idErr').classList.add('show'); idEl.classList.add('err'); bad = true; }
+  if (!pw) { document.getElementById('pwErr').classList.add('show'); pwEl.classList.add('err'); bad = true; }
+  if (bad) return;
+
+  var btn = document.getElementById('signInBtn');
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  setTimeout(function(){
+    btn.textContent = 'Sign in';
+    btn.disabled = false;
+    pwEl.value = '';
+    nav('dashboard', 0);
+  }, 550);
+}
+
+/* enter-to-submit */
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && document.getElementById('p-login').classList.contains('show')) {
+    doSignIn();
+  }
+});
+/* boot: unauthenticated */
+nav('login', null);
+
+setInterval(function() {
+  var n = (15 + Math.random()*8).toFixed(1);
+  var h = (5 + Math.random()*3).toFixed(1);
+  var ne = document.getElementById('nh3'), he = document.getElementById('h2s');
+  var nb = document.getElementById('nh3-b'), hb = document.getElementById('h2s-b');
+  if(ne){ne.textContent=n; nb.style.width=(n/50*100)+'%';}
+  if(he){he.textContent=h; hb.style.width=(h/20*100)+'%';}
+}, 2200);
+</script>
+
+</body>
+</html>
