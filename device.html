@@ -1,3 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeatScentinel — IoT Device (LCD)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.2.0/dist/tabler-icons.min.css">
+<style>
+  :root {
+    --color-background-secondary: #F2ECEC;
+    --color-text-primary: #2A1A1A;
+    --color-text-tertiary: #B08A8A;
+    --border-radius-lg: 18px;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 56px 20px 32px;
+    background: #F2ECEC;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .backhome {
+    position: fixed; top: 14px; left: 14px; z-index: 100;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff; border: 1px solid #EDD8D8; border-radius: 20px;
+    padding: 6px 13px 6px 10px; font-size: 12px; color: #7A5A5A;
+    text-decoration: none; box-shadow: 0 2px 8px rgba(42,26,26,.06);
+  }
+  .backhome:hover { background: #FBEFEF; color: #2A1A1A; }
+</style>
+</head>
+<body>
+<a class="backhome" href="index.html"><i class="ti ti-arrow-left" style="font-size:14px"></i> Back</a>
 <div class="ms-wrap" style="--ms-bg:#FCF8F8; --ms-panel:#F7E6E6; --ms-panel2:#F9DFDF; --ms-accent:#F5AFAF; --ms-accent-dark:#8F3A3E; --ms-text:#2A1C1C; --ms-text-soft:#7C6666; --ms-green:#2F6B45; --ms-green-bg:#E4F0E8; --ms-red:#8B1A1A; --ms-red-bg:#F7DEDE; --ms-amber:#8A5200; --ms-amber-bg:#FBF0DC; --ms-gray:#6E5C5C; --ms-gray-bg:#ECE4E4;">
 
 <style>
@@ -462,3 +500,6 @@ applyThresholds();
 goTo(1);
 </script>
 </div>
+
+</body>
+</html>
