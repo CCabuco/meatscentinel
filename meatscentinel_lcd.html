@@ -1,0 +1,464 @@
+<div class="ms-wrap" style="--ms-bg:#FCF8F8; --ms-panel:#F7E6E6; --ms-panel2:#F9DFDF; --ms-accent:#F5AFAF; --ms-accent-dark:#8F3A3E; --ms-text:#2A1C1C; --ms-text-soft:#7C6666; --ms-green:#2F6B45; --ms-green-bg:#E4F0E8; --ms-red:#8B1A1A; --ms-red-bg:#F7DEDE; --ms-amber:#8A5200; --ms-amber-bg:#FBF0DC; --ms-gray:#6E5C5C; --ms-gray-bg:#ECE4E4;">
+
+<style>
+.ms-wrap{background:var(--color-background-secondary); border-radius:var(--border-radius-lg); padding:1.25rem; display:flex; flex-direction:column; align-items:center;}
+.ms-frame{width:100%; max-width:640px; aspect-ratio:5/3; background:#242020; border-radius:24px; padding:10px; box-sizing:border-box;}
+.ms-screen{background:var(--ms-bg); border-radius:14px; height:100%; width:100%; display:flex; flex-direction:column; overflow:hidden; font-family:var(--font-sans); color:var(--ms-text); box-sizing:border-box;}
+
+.ms-header{display:flex; align-items:center; justify-content:space-between; padding:14px 22px 6px; flex-shrink:0; gap:10px;}
+.hdr-left{display:flex; align-items:center; gap:9px; min-width:0;}
+.wordmark{font-size:12.5px; font-weight:500; color:var(--ms-text-soft); margin:0; white-space:nowrap;}
+.hdr-right{display:flex; align-items:center; gap:9px; flex-shrink:0;}
+.step-label{font-size:10.5px; font-weight:500; color:var(--ms-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums;}
+.dots{display:flex; gap:5px;}
+.dot{width:5px; height:5px; border-radius:3px; background:var(--ms-panel2);}
+.dot.active{width:14px; background:var(--ms-accent-dark);}
+
+.ms-body{flex:1; padding:4px 24px 18px; display:flex; flex-direction:column; min-height:0;}
+.panel{display:none; flex:1; flex-direction:column; min-height:0;}
+.panel.active{display:flex; animation:fadeIn .25s ease;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(3px);} to{opacity:1; transform:translateY(0);}}
+.label{font-size:12.5px; font-weight:500; color:var(--ms-text-soft); margin:0;}
+.status-text{font-size:16px; font-weight:500; margin:0 0 4px;}
+.caption{font-size:12px; color:var(--ms-text-soft); margin:0; line-height:1.5;}
+.stat-num{font-size:19px; font-weight:500; margin:2px 0 0; font-variant-numeric:tabular-nums;}
+.thresh{font-size:10.5px; color:var(--ms-text-soft); margin:1px 0 0; font-variant-numeric:tabular-nums;}
+
+.btn-primary{background:var(--ms-accent-dark); color:#fff; border:none; font-size:13px; font-weight:500; padding:11px 20px; border-radius:18px; cursor:pointer; font-family:inherit;}
+.btn-primary:disabled{opacity:.32; cursor:not-allowed;}
+.btn-secondary{background:var(--ms-panel); color:var(--ms-accent-dark); border:none; font-size:13px; font-weight:500; padding:11px 18px; border-radius:18px; cursor:pointer; font-family:inherit;}
+.btn-ghost{background:none; border:none; color:var(--ms-accent-dark); font-size:12.5px; font-weight:500; padding:8px 2px; cursor:pointer; font-family:inherit;}
+.btn-back{display:flex; align-items:center; gap:3px; background:none; border:none; color:var(--ms-text-soft); font-size:12.5px; font-weight:500; padding:6px 8px 6px 0; cursor:pointer; font-family:inherit;}
+.btn-back:hover{color:var(--ms-text);}
+
+.tile{flex:1; background:var(--ms-panel); border:1.5px solid transparent; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; cursor:pointer; position:relative; transition:background .15s, border-color .15s;}
+.tile.selected{background:var(--ms-accent); border-color:var(--ms-accent-dark);}
+.tile .check{position:absolute; top:9px; right:9px; font-size:13px; opacity:0; color:var(--ms-text); transition:opacity .15s;}
+.tile.selected .check{opacity:1;}
+.tile-icon{font-size:26px; color:var(--ms-accent-dark);}
+.tile.selected .tile-icon{color:var(--ms-text);}
+.tile-name{font-size:12.5px; font-weight:500;}
+
+.chamber-circle{width:76px; height:76px; border-radius:50%; background:var(--ms-panel); display:flex; align-items:center; justify-content:center; color:var(--ms-text-soft); flex-shrink:0; transition:background .2s, color .2s;}
+.ring{width:96px; height:96px; border-radius:50%; background:conic-gradient(var(--ms-accent-dark) calc(var(--p)*1%), var(--ms-panel2) 0); display:flex; align-items:center; justify-content:center;}
+.ring-inner{width:74px; height:74px; border-radius:50%; background:var(--ms-bg); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:500; font-variant-numeric:tabular-nums;}
+
+.seg{display:flex; gap:2px; background:var(--ms-panel); border-radius:10px; padding:2px;}
+.seg-btn{font-size:11px; padding:5px 9px; border-radius:8px; border:none; background:transparent; color:var(--ms-text-soft); cursor:pointer; font-family:inherit;}
+.seg-btn.active{background:var(--ms-bg); color:var(--ms-text); font-weight:500;}
+
+.status-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+.result-word{font-size:21px; font-weight:500;}
+.result-banner{display:flex; align-items:center; gap:9px; margin:8px 0 3px; padding:0; border-radius:10px; transition:background .2s, padding .2s;}
+.result-banner.alert{background:var(--ms-amber-bg); border:1.5px solid #E0B871; padding:8px 12px;}
+
+.demo-nav{display:flex; gap:16px; justify-content:center; margin-top:14px; flex-wrap:wrap;}
+.demo-nav button{font-size:11.5px; background:none; border:none; border-bottom:1.5px solid transparent; color:var(--color-text-tertiary); cursor:pointer; font-family:inherit; padding:4px 1px;}
+.demo-nav button.active{color:var(--color-text-primary); font-weight:500; border-color:var(--color-text-primary);}
+</style>
+
+<div class="ms-frame">
+  <div class="ms-screen">
+
+    <div class="ms-header">
+      <div class="hdr-left">
+        <p class="wordmark">Meatscentinel</p>
+      </div>
+      <div class="hdr-right">
+        <span class="step-label" id="stepLabel">1 / 5</span>
+        <div class="dots" id="stepDots">
+          <span class="dot active"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="ms-body">
+
+      <div class="panel active" id="panel1" style="justify-content:space-between;">
+        <p class="label">Select sample type</p>
+        <div style="display:flex; gap:12px; flex:1; margin:14px 0;">
+          <div class="tile" data-type="Raw chicken" onclick="selectType(this)">
+            <i class="ti ti-check check" aria-hidden="true"></i>
+            <i class="ti ti-feather tile-icon" aria-hidden="true"></i>
+            <span class="tile-name">Raw chicken</span>
+          </div>
+          <div class="tile" data-type="Raw pork" onclick="selectType(this)">
+            <i class="ti ti-check check" aria-hidden="true"></i>
+            <i class="ti ti-pig tile-icon" aria-hidden="true"></i>
+            <span class="tile-name">Raw pork</span>
+          </div>
+          <div class="tile" data-type="Raw beef" onclick="selectType(this)">
+            <i class="ti ti-check check" aria-hidden="true"></i>
+            <i class="ti ti-meat tile-icon" aria-hidden="true"></i>
+            <span class="tile-name">Raw beef</span>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <button class="btn-ghost" onclick="clearSelection()">Clear selection</button>
+          <button class="btn-primary" id="continueBtn1" disabled onclick="goTo(2)">Continue</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel2" style="justify-content:space-between;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <button class="btn-back" onclick="goTo(1)"><i class="ti ti-chevron-left" style="font-size:14px;" aria-hidden="true"></i>Back</button>
+          <p class="label" id="placeSampleLabel">Place sample</p>
+        </div>
+        <div style="flex:1; display:flex; align-items:center; gap:20px;">
+          <div class="chamber-circle" id="chamberCircle"><i class="ti ti-box" id="chamberIcon" style="font-size:26px;" aria-hidden="true"></i></div>
+          <div>
+            <p class="status-text" id="placementStatus">Waiting for sample</p>
+            <p class="caption" id="placementHint" style="max-width:250px;">Ultrasonic sensor must confirm the sample.</p>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <button class="btn-ghost" id="sensorToggleBtn" onclick="toggleSensor()">Simulate: place</button>
+          <button class="btn-primary" id="startDetectionBtn" disabled onclick="goTo(3)">Start detection</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel3" style="justify-content:space-between;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <button class="btn-back" onclick="cancelDetection()"><i class="ti ti-x" style="font-size:14px;" aria-hidden="true"></i>Cancel</button>
+          <p class="label">Detecting</p>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div class="ring" id="detectRing" style="--p:0;">
+            <div class="ring-inner" id="ringText">0%</div>
+          </div>
+          <p class="status-text" style="margin-top:14px;">Reading NH&#8323; and H&#8322;S</p>
+          <p class="caption" id="timeLeft">30s remaining</p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel4" style="justify-content:space-between;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <p class="label">Gas-based result</p>
+          <div class="seg">
+            <button class="seg-btn active" data-state="fresh" onclick="setResult(this,'fresh')">Fresh</button>
+            <button class="seg-btn" data-state="spoiled" onclick="setResult(this,'spoiled')">Spoiled</button>
+            <button class="seg-btn" data-state="invalid" onclick="setResult(this,'invalid')">Invalid</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="result-banner" id="resultBanner">
+            <span class="status-dot" id="resultDot" style="background:var(--ms-green);"></span>
+            <span class="result-word" id="resultText" style="color:var(--ms-green);">Fresh</span>
+          </div>
+          <p class="caption" id="resultNote">Gas result only &mdash; final classification in web app</p>
+        </div>
+
+        <div style="display:flex; gap:26px; margin:12px 0;">
+          <div>
+            <p class="caption">Avg NH&#8323;</p>
+            <p class="stat-num" id="nh3Val">8.4 ppm</p>
+            <p class="thresh" id="nh3Thresh">limit 25</p>
+          </div>
+          <div style="width:0.5px; background:var(--ms-panel2);"></div>
+          <div>
+            <p class="caption">Avg H&#8322;S</p>
+            <p class="stat-num" id="h2sVal">0.6 ppm</p>
+            <p class="thresh" id="h2sThresh">limit 10</p>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="display:flex; align-items:center; gap:5px; cursor:pointer;" onclick="cycleUpload()">
+            <i class="ti ti-cloud-check" id="uploadIcon" style="font-size:14px; color:var(--ms-green);" aria-hidden="true"></i>
+            <span class="caption" id="uploadText">Upload successful</span>
+            <i class="ti ti-chevron-right" style="font-size:12px; color:var(--ms-text-soft);" aria-hidden="true"></i>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-secondary" id="retestBtn" onclick="retest()">Retest</button>
+            <button class="btn-primary" id="ventBtnMain" onclick="goTo(5)">Ventilate chamber</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel5" style="align-items:center; justify-content:center;">
+        <div class="ring" id="ventRing" style="--p:0;">
+          <div class="ring-inner"><i class="ti ti-wind" id="ventRingIcon" style="font-size:22px; color:var(--ms-text-soft);" aria-hidden="true"></i></div>
+        </div>
+        <p class="status-text" id="ventStatus" style="margin-top:16px;">Ready to ventilate</p>
+        <p class="caption" id="ventCaption" style="text-align:center; max-width:260px;">Clears residual gas. Not a substitute for cleaning.</p>
+        <div style="display:flex; gap:14px; margin-top:14px;" id="ventActions">
+          <button class="btn-ghost" onclick="resetVent()">Reset</button>
+          <button class="btn-primary" id="ventBtn" onclick="startVent()">Start ventilation</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="demo-nav" id="demoNav">
+  <button data-n="1" class="active" onclick="goTo(1)">Select sample</button>
+  <button data-n="2" onclick="goTo(2)">Place sample</button>
+  <button data-n="3" onclick="goTo(3)">Detecting</button>
+  <button data-n="4" onclick="goTo(4)">Result</button>
+  <button data-n="5" onclick="goTo(5)">Ventilation</button>
+</div>
+
+<script>
+var sensorOn = false;
+var selectedType = null;
+var currentState = 'fresh';
+
+var STEP_NAMES = ['Select sample','Place sample','Detecting','Result','Ventilation'];
+
+var THRESHOLDS = {
+  'Raw chicken': { nh3: 25, h2s: 10 },
+  'Raw pork':    { nh3: 30, h2s: 12 },
+  'Raw beef':    { nh3: 28, h2s: 11 }
+};
+
+function selectType(el){
+  var tiles = document.querySelectorAll('.tile');
+  for(var i=0;i<tiles.length;i++){ tiles[i].classList.remove('selected'); }
+  el.classList.add('selected');
+  selectedType = el.getAttribute('data-type');
+  document.getElementById('continueBtn1').disabled = false;
+  document.getElementById('placeSampleLabel').textContent = selectedType;
+  applyThresholds();
+}
+
+function clearSelection(){
+  var tiles = document.querySelectorAll('.tile');
+  for(var i=0;i<tiles.length;i++){ tiles[i].classList.remove('selected'); }
+  selectedType = null;
+  document.getElementById('continueBtn1').disabled = true;
+  document.getElementById('placeSampleLabel').textContent = 'Place sample';
+}
+
+function applyThresholds(){
+  var t = THRESHOLDS[selectedType] || { nh3: 25, h2s: 10 };
+  document.getElementById('nh3Thresh').textContent = 'limit ' + t.nh3;
+  document.getElementById('h2sThresh').textContent = 'limit ' + t.h2s;
+}
+
+function resetPlacement(){
+  sensorOn = false;
+  document.getElementById('placementStatus').textContent = 'Waiting for sample';
+  document.getElementById('placementHint').textContent = 'Ultrasonic sensor must confirm the sample.';
+  var icon = document.getElementById('chamberIcon');
+  icon.className = 'ti ti-box';
+  icon.style.color = 'var(--ms-text-soft)';
+  document.getElementById('chamberCircle').style.background = 'var(--ms-panel)';
+  document.getElementById('sensorToggleBtn').textContent = 'Simulate: place';
+  document.getElementById('startDetectionBtn').disabled = true;
+}
+
+function toggleSensor(){
+  sensorOn = !sensorOn;
+  var status = document.getElementById('placementStatus');
+  var hint = document.getElementById('placementHint');
+  var icon = document.getElementById('chamberIcon');
+  var circle = document.getElementById('chamberCircle');
+  var btn = document.getElementById('sensorToggleBtn');
+  var startBtn = document.getElementById('startDetectionBtn');
+  if(sensorOn){
+    status.textContent = 'Sample detected';
+    hint.textContent = 'Chamber ready.';
+    icon.className = 'ti ti-circle-check';
+    icon.style.color = 'var(--ms-green)';
+    circle.style.background = 'var(--ms-green-bg)';
+    btn.textContent = 'Simulate: remove';
+    startBtn.disabled = false;
+  } else {
+    resetPlacement();
+  }
+}
+
+var detectTimer = null;
+var DETECT_SECONDS = 30;
+
+function runDetecting(){
+  var p = 0;
+  var ring = document.getElementById('detectRing');
+  var text = document.getElementById('ringText');
+  var timeLeft = document.getElementById('timeLeft');
+  ring.style.setProperty('--p', 0);
+  text.textContent = '0%';
+  timeLeft.textContent = DETECT_SECONDS + 's remaining';
+  clearInterval(detectTimer);
+  detectTimer = setInterval(function(){
+    p += 3;
+    var v = Math.min(p, 100);
+    ring.style.setProperty('--p', v);
+    text.textContent = v + '%';
+    var secs = Math.ceil(DETECT_SECONDS * (100 - v) / 100);
+    timeLeft.textContent = secs > 0 ? (secs + 's remaining') : 'Finalising...';
+    if(p >= 100){ clearInterval(detectTimer); goTo(4); }
+  }, 90);
+}
+
+function cancelDetection(){
+  clearInterval(detectTimer);
+  goTo(2);
+}
+
+function setResult(el, state){
+  currentState = state;
+  if(el){
+    var segs = document.querySelectorAll('#panel4 .seg-btn');
+    for(var i=0;i<segs.length;i++){ segs[i].classList.remove('active'); }
+    el.classList.add('active');
+  }
+  var banner = document.getElementById('resultBanner');
+  var dot = document.getElementById('resultDot');
+  var text = document.getElementById('resultText');
+  var note = document.getElementById('resultNote');
+  var nh3 = document.getElementById('nh3Val');
+  var h2s = document.getElementById('h2sVal');
+  var retestBtn = document.getElementById('retestBtn');
+  var ventBtn = document.getElementById('ventBtnMain');
+
+  banner.classList.remove('alert');
+  retestBtn.className = 'btn-secondary';
+  ventBtn.className = 'btn-primary';
+
+  if(state === 'fresh'){
+    dot.style.background = 'var(--ms-green)';
+    text.style.color = 'var(--ms-green)';
+    text.textContent = 'Fresh';
+    note.textContent = 'Gas result only - final classification in web app';
+    nh3.textContent = '8.4 ppm';
+    h2s.textContent = '0.6 ppm';
+  } else if(state === 'spoiled'){
+    dot.style.background = 'var(--ms-red)';
+    text.style.color = 'var(--ms-red)';
+    text.textContent = 'Spoiled';
+    note.textContent = 'Gas result only - final classification in web app';
+    nh3.textContent = '42.1 ppm';
+    h2s.textContent = '5.3 ppm';
+  } else {
+    banner.classList.add('alert');
+    dot.style.background = 'var(--ms-amber)';
+    text.style.color = 'var(--ms-amber)';
+    text.textContent = 'Invalid reading';
+    note.textContent = 'Flagged For Review - ventilate, then retest.';
+    nh3.textContent = '--';
+    h2s.textContent = '--';
+    retestBtn.className = 'btn-primary';
+    ventBtn.className = 'btn-secondary';
+  }
+  applyThresholds();
+}
+
+function retest(){
+  clearInterval(detectTimer);
+  resetPlacement();
+  goTo(2);
+}
+
+var uploadStates = ['success','uploading','failed'];
+var uploadIdx = 0;
+
+function cycleUpload(){
+  uploadIdx = (uploadIdx + 1) % uploadStates.length;
+  var state = uploadStates[uploadIdx];
+  var icon = document.getElementById('uploadIcon');
+  var text = document.getElementById('uploadText');
+  if(state === 'success'){
+    icon.className = 'ti ti-cloud-check';
+    icon.style.color = 'var(--ms-green)';
+    text.textContent = 'Upload successful';
+  } else if(state === 'uploading'){
+    icon.className = 'ti ti-cloud-upload';
+    icon.style.color = 'var(--ms-text-soft)';
+    text.textContent = 'Uploading...';
+  } else {
+    icon.className = 'ti ti-cloud-off';
+    icon.style.color = 'var(--ms-red)';
+    text.textContent = 'Failed - queued locally';
+  }
+}
+
+var ventTimer = null;
+var returnTimer = null;
+
+function startVent(){
+  document.getElementById('ventStatus').textContent = 'Ventilating...';
+  document.getElementById('ventBtn').disabled = true;
+  var ring = document.getElementById('ventRing');
+  var p = 0;
+  clearInterval(ventTimer);
+  ventTimer = setInterval(function(){
+    p += 4;
+    ring.style.setProperty('--p', Math.min(p, 100));
+    if(p >= 100){
+      clearInterval(ventTimer);
+      document.getElementById('ventStatus').textContent = 'Ventilation complete';
+      var count = 3;
+      var cap = document.getElementById('ventCaption');
+      cap.textContent = 'Returning in ' + count + 's...';
+      document.getElementById('ventActions').innerHTML =
+        '<button class="btn-ghost" onclick="cancelReturn()">Stay here</button>' +
+        '<button class="btn-primary" onclick="newInspection()">Start new inspection</button>';
+      clearInterval(returnTimer);
+      returnTimer = setInterval(function(){
+        count--;
+        if(count > 0){
+          cap.textContent = 'Returning in ' + count + 's...';
+        } else {
+          clearInterval(returnTimer);
+          newInspection();
+        }
+      }, 1000);
+    }
+  }, 120);
+}
+
+function cancelReturn(){
+  clearInterval(returnTimer);
+  document.getElementById('ventCaption').textContent = 'Complete - ready for next inspection.';
+}
+
+function newInspection(){
+  clearInterval(returnTimer);
+  clearInterval(ventTimer);
+  resetPlacement();
+  clearSelection();
+  currentState = 'fresh';
+  goTo(1);
+}
+
+function resetVent(){
+  clearInterval(ventTimer);
+  clearInterval(returnTimer);
+  document.getElementById('ventRing').style.setProperty('--p', 0);
+  document.getElementById('ventStatus').textContent = 'Ready to ventilate';
+  document.getElementById('ventCaption').textContent = 'Clears residual gas. Not a substitute for cleaning.';
+  document.getElementById('ventActions').innerHTML =
+    '<button class="btn-ghost" onclick="resetVent()">Reset</button>' +
+    '<button class="btn-primary" id="ventBtn" onclick="startVent()">Start ventilation</button>';
+}
+
+function updateSteps(n){
+  var dots = document.querySelectorAll('#stepDots .dot');
+  for(var i=0;i<dots.length;i++){
+    if(i === n-1){ dots[i].classList.add('active'); } else { dots[i].classList.remove('active'); }
+  }
+  document.getElementById('stepLabel').textContent = n + ' / 5';
+}
+
+function goTo(n){
+  if(n !== 3){ clearInterval(detectTimer); }
+  if(n !== 5){ clearInterval(ventTimer); clearInterval(returnTimer); }
+  var panels = document.querySelectorAll('.panel');
+  for(var i=0;i<panels.length;i++){ panels[i].classList.remove('active'); }
+  document.getElementById('panel' + n).classList.add('active');
+  var navs = document.querySelectorAll('#demoNav button');
+  for(var j=0;j<navs.length;j++){ navs[j].classList.remove('active'); }
+  document.querySelector('#demoNav button[data-n="' + n + '"]').classList.add('active');
+  updateSteps(n);
+  if(n === 3){ runDetecting(); }
+  if(n === 5){ resetVent(); }
+  if(n === 4){ setResult(null, currentState); }
+}
+
+applyThresholds();
+goTo(1);
+</script>
+</div>
