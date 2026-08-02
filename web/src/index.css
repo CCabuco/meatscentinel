@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-surface-sunken text-ink;
+  }
+  h1 { @apply text-xl font-medium text-ink; }
+  h2 { @apply text-base font-medium text-ink; }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-surface-line rounded-xl;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-ink-muted mb-1.5;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-surface-line bg-surface px-3 py-2 text-sm text-ink
+           placeholder:text-ink-faint
+           focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500
+           disabled:bg-surface-sunken disabled:text-ink-faint;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply btn border border-surface-line bg-surface text-ink hover:bg-surface-sunken;
+  }
+  .btn-ghost {
+    @apply btn text-ink-muted hover:bg-surface-sunken;
+  }
+
+  .alert {
+    @apply rounded-lg border px-3 py-2 text-sm;
+  }
+  .alert-error {
+    @apply alert border-state-spoiled/25 bg-state-spoiledBg text-state-spoiled;
+  }
+  .alert-success {
+    @apply alert border-state-fresh/25 bg-state-freshBg text-state-fresh;
+  }
+  .alert-notice {
+    @apply alert border-state-review/25 bg-state-reviewBg text-state-review;
+  }
+
+  .readonly-value {
+    @apply rounded-lg bg-surface-sunken border border-surface-line px-3 py-2 text-sm text-ink;
+  }
+}
+
+@layer components {
+  .sr-only {
+    @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0;
+    clip: rect(0, 0, 0, 0);
+  }
+}
