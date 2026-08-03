@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { signOut as doSignOut } from '../lib/auth.js';
 
@@ -17,19 +17,53 @@ export function AuthProvider({ children }) {
   // the instant the flag flips, even though their token has not expired.
   // No row means deactivated: sign out rather than render a shell the
   // user cannot load anything into.
+  // AD-02 / U-F — deactivation is immediate.
+  //
+  // Every RLS policy requires is_active, including the one on accounts, so a
+  // deactivated user's own row becomes unreadable the moment the flag flips.
+  // "Signed in but no row" therefore means deactivated — but ONLY when the
+  // query genuinely returned no row. A query that ERRORED (network hiccup,
+  // token still settling in the first moments after sign-in) proves nothing,
+  // and signing out on it produced a flash of the landing page followed by a
+  // bounce back to login. Errors now retry once, then leave the session
+  // alone; the route guards keep unauthorised screens unreachable either way.
+  const loadSeq = useRef(0);
+
   const loadAccount = useCallback(async (userId) => {
     if (!userId) {
       setAccount(null);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('accounts')
-      .select('id, user_id, email, display_name, role, is_active, created_at')
-      .eq('id', userId)
-      .maybeSingle();
+    const seq = ++loadSeq.current;
 
-    if (error || !data) {
+    const attempt = () =>
+      supabase
+        .from('accounts')
+        .select('id, user_id, email, display_name, role, is_active, created_at')
+        .eq('id', userId)
+        .maybeSingle();
+
+    let { data, error } = await attempt();
+
+    if (error) {
+      await new Promise((r) => setTimeout(r, 400));
+      if (seq !== loadSeq.current) return;
+      ({ data, error } = await attempt());
+    }
+
+    // A newer load has started (another auth event fired); let it win rather
+    // than racing it to setState.
+    if (seq !== loadSeq.current) return;
+
+    if (error) {
+      // Could not determine anything. Keep whatever we had; do not sign out
+      // on a failed lookup.
+      return;
+    }
+
+    if (!data) {
+      // Clean answer, zero rows: the policies refused. Deactivated.
       setAccount(null);
       setDeactivated(true);
       await doSignOut();

@@ -1,8 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import PasswordStrength from '../components/PasswordStrength.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { changePassword, requestEmailChange, validateEmail } from '../lib/auth.js';
+import {
+  changePassword,
+  requestEmailChange,
+  validateEmail,
+  getPendingEmail,
+  resendEmailChange,
+  cancelPendingEmailChange,
+} from '../lib/auth.js';
 import { evaluatePassword } from '../lib/passwordPolicy.js';
 
 const ROLE_LABEL = {
@@ -62,20 +69,54 @@ function AccountInformation({ account }) {
 
 // D-07 / D-08 — the registered email is the account recovery contact.
 function RecoveryEmail({ account }) {
-  const [email, setEmail] = useState(account.email);
+  // readonly -> editing -> pending, driven by whether Supabase reports a
+  // pending address awaiting confirmation.
+  const [pending, setPending] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    getPendingEmail().then(setPending);
+  }, []);
+
+  // Client-side resend cooldown. Supabase enforces the real limit
+  // server-side; this keeps the button honest about it.
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   const trimmed = email.trim();
-  const changed = trimmed !== account.email;
-  const formatError = changed ? validateEmail(trimmed) : null;
+  const formatError = trimmed ? validateEmail(trimmed) : null;
+  const sameAsCurrent = trimmed.toLowerCase() === account.email.toLowerCase();
+  const canSave =
+    trimmed && !formatError && !sameAsCurrent && password.length > 0;
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  function startEditing() {
+    setEmail('');
+    setPassword('');
     setStatus(null);
-    setBusy(true);
+    setEditing(true);
+  }
 
-    const { error } = await requestEmailChange(trimmed);
+  function cancelEditing() {
+    setEditing(false);
+    setEmail('');
+    setPassword('');
+    setStatus(null);
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    setBusy(true);
+    setStatus(null);
+
+    const { error } = await requestEmailChange(account.email, password, trimmed);
     setBusy(false);
 
     if (error) {
@@ -83,15 +124,44 @@ function RecoveryEmail({ account }) {
       return;
     }
 
-    // The address on file has not changed yet, so the field is reset to the
-    // current one. Showing the new address here would suggest the change had
-    // already taken effect.
-    setEmail(account.email);
+    setPending(trimmed);
+    setEditing(false);
+    setPassword('');
+    setCooldown(60);
     setStatus({
       tone: 'success',
-      message:
-        `A confirmation link has been sent to ${trimmed}. Your recovery ` +
-        'address changes once you open it.',
+      message: `A confirmation link has been sent to ${trimmed}.`,
+    });
+  }
+
+  async function resend() {
+    setBusy(true);
+    setStatus(null);
+    const { error } = await resendEmailChange(pending);
+    setBusy(false);
+
+    if (error) {
+      setStatus({ tone: 'error', message: error });
+      return;
+    }
+    setCooldown(60);
+    setStatus({ tone: 'success', message: `Confirmation link resent to ${pending}.` });
+  }
+
+  async function cancelChange() {
+    setBusy(true);
+    setStatus(null);
+    const { error } = await cancelPendingEmailChange();
+    setBusy(false);
+
+    if (error) {
+      setStatus({ tone: 'error', message: error });
+      return;
+    }
+    setPending(null);
+    setStatus({
+      tone: 'success',
+      message: 'Email change cancelled. Your current address is unchanged.',
     });
   }
 
@@ -100,46 +170,117 @@ function RecoveryEmail({ account }) {
       <h2 className="mb-1">Recovery email</h2>
       <p className="text-sm text-ink-muted mb-4">
         Password reset links are sent to this address. Changing it requires
-        confirming the new address first.
+        your password and confirmation from the new address.
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+      <div className="max-w-md space-y-4">
         {status && (
           <div className={status.tone === 'error' ? 'alert-error' : 'alert-success'}>
             {status.message}
           </div>
         )}
 
-        <div>
-          <label className="label" htmlFor="email">
-            Email address
-          </label>
-          <input
-            id="email"
-            type="email"
-            className="input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          {formatError && (
-            <p className="text-xs text-state-spoiled mt-1.5">{formatError}</p>
-          )}
-        </div>
+        {!editing && (
+          <div>
+            <p className="label">Email address</p>
+            <div className="flex items-center gap-3">
+              <p className="readonly-value flex-1">{account.email}</p>
+              {!pending && (
+                <button type="button" className="btn-secondary" onClick={startEditing}>
+                  Change email
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
-        <button
-          type="submit"
-          className="btn-primary"
-          disabled={busy || !changed || Boolean(formatError)}
-        >
-          {busy ? 'Sending…' : 'Send confirmation link'}
-        </button>
+        {pending && !editing && (
+          <div className="rounded-lg border border-state-review/25 bg-state-reviewBg px-4 py-3 space-y-3">
+            <div>
+              <p className="text-sm text-state-review font-medium">
+                Awaiting confirmation
+              </p>
+              <p className="text-sm text-state-review mt-0.5">
+                A link was sent to {pending}. Your address changes once it is
+                opened. Until then, reset emails go to {account.email}.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn-secondary text-xs py-1.5"
+                onClick={resend}
+                disabled={busy || cooldown > 0}
+              >
+                {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend link'}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-xs py-1.5"
+                onClick={cancelChange}
+                disabled={busy}
+              >
+                Cancel email change
+              </button>
+            </div>
+          </div>
+        )}
 
-        <p className="text-xs text-ink-faint">
-          Until the link is opened, reset emails continue going to your current
-          address.
-        </p>
-      </form>
+        {editing && (
+          <form onSubmit={save} className="space-y-4">
+            <div>
+              <label className="label" htmlFor="newEmailAddress">
+                New email address
+              </label>
+              <input
+                id="newEmailAddress"
+                type="email"
+                className="input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoFocus
+                required
+              />
+              {formatError && (
+                <p className="text-xs text-state-spoiled mt-1.5">{formatError}</p>
+              )}
+              {sameAsCurrent && trimmed && (
+                <p className="text-xs text-state-spoiled mt-1.5">
+                  That is already your current address.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="label" htmlFor="confirmWithPassword">
+                Current password
+              </label>
+              <input
+                id="confirmWithPassword"
+                type="password"
+                className="input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+              <p className="text-xs text-ink-faint mt-1.5">
+                Your email address is how this account is recovered, so
+                changing it requires your password.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button type="submit" className="btn-primary" disabled={busy || !canSave}>
+                {busy ? 'Sending…' : 'Save'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={cancelEditing}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </section>
   );
 }
