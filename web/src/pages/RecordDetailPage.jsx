@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell.jsx';
+import Modal from '../components/Modal.jsx';
 import { ClassificationBadge } from '../components/Badge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime, formatPpm, titleCaseSample } from '../lib/format.js';
@@ -22,6 +23,11 @@ export default function RecordDetailPage() {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [remarkOpen, setRemarkOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,13 +66,17 @@ export default function RecordDetailPage() {
     return (
       <AppShell>
         <div className="alert-error mb-4">{error}</div>
-        <Link to="/records" className="btn-secondary">Back to records</Link>
+        <Link to="/records" className="btn-secondary">
+          Back to records
+        </Link>
       </AppShell>
     );
   }
 
-  const currentStatus = timeline.filter((e) => e.kind === 'status').at(-1)?.status ?? null;
-  const currentRemark = timeline.filter((e) => e.kind === 'remark').at(-1)?.content ?? null;
+  const statusEntries = timeline.filter((e) => e.kind === 'status');
+  const remarkEntries = timeline.filter((e) => e.kind === 'remark');
+  const currentStatus = statusEntries.at(-1)?.status ?? null;
+  const currentRemark = remarkEntries.at(-1) ?? null;
 
   return (
     <AppShell>
@@ -83,34 +93,71 @@ export default function RecordDetailPage() {
         </div>
       </div>
 
+      {feedback && (
+        <div className={`${feedback.tone === 'error' ? 'alert-error' : 'alert-success'} mb-4`}>
+          {feedback.message}
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <FusionPanel record={record} />
-          <DetailPanel
-            record={record}
-            currentStatus={currentStatus}
-            currentRemark={currentRemark}
-          />
+          <DetailPanel record={record} currentStatus={currentStatus} />
           <ImagePanel record={record} imageUrl={imageUrl} />
         </div>
 
         <div className="space-y-6">
-          <ActionsPanel
-            record={record}
-            account={account}
-            currentStatus={currentStatus}
-            onDone={load}
+          <RemarksPanel
+            currentRemark={currentRemark}
+            entryCount={timeline.length}
+            onViewHistory={() => setHistoryOpen(true)}
+            onCreate={() => setRemarkOpen(true)}
           />
-          <TimelinePanel timeline={timeline} />
+          <StatusPanel
+            currentStatus={currentStatus}
+            onChange={() => setStatusOpen(true)}
+          />
         </div>
       </div>
+
+      <HistoryModal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        inspectionId={record.inspection_id}
+        timeline={timeline}
+      />
+
+      <CreateRemarkModal
+        open={remarkOpen}
+        onClose={() => setRemarkOpen(false)}
+        inspectionId={record.inspection_id}
+        accountId={account.id}
+        onCreated={(message) => {
+          setRemarkOpen(false);
+          setFeedback({ tone: 'success', message });
+          load();
+        }}
+      />
+
+      <ChangeStatusModal
+        open={statusOpen}
+        onClose={() => setStatusOpen(false)}
+        inspectionId={record.inspection_id}
+        accountId={account.id}
+        currentStatus={currentStatus}
+        onChanged={(message) => {
+          setStatusOpen(false);
+          setFeedback({ tone: 'success', message });
+          load();
+        }}
+      />
     </AppShell>
   );
 }
 
-// Shows how the classification was reached, not just what it was. A
-// record that reads "For Review" is otherwise opaque — this says which
-// input was missing or invalid.
+// Shows how the classification was reached, not just what it was. A record
+// reading "For Review" is otherwise opaque — this says which input was
+// missing or invalid.
 function FusionPanel({ record }) {
   const pending = record.pairing_state === 'pending';
 
@@ -165,14 +212,12 @@ function InputCard({ label, present, valid, value, missingText, invalidText }) {
     <div className="rounded-lg border border-surface-line bg-surface-sunken p-3 flex flex-col justify-between">
       <p className="text-xs font-medium text-ink-muted">{label}</p>
       <div className="mt-2">{body}</div>
-      <p className="text-xs text-ink-faint mt-2">
-        {present ? 'Received' : 'Awaiting'}
-      </p>
+      <p className="text-xs text-ink-faint mt-2">{present ? 'Received' : 'Awaiting'}</p>
     </div>
   );
 }
 
-function DetailPanel({ record, currentStatus, currentRemark }) {
+function DetailPanel({ record, currentStatus }) {
   return (
     <section className="card p-5">
       <h2 className="mb-4">Inspection details</h2>
@@ -190,18 +235,6 @@ function DetailPanel({ record, currentStatus, currentRemark }) {
         <Detail label="External image-based result" value={record.image_result ?? '—'} />
         <Detail label="Current case status" value={currentStatus ?? '—'} />
       </dl>
-
-      {/*
-        The Record Details field list names "current remarks" as its own
-        item, separate from the history. It is the most recent remark; the
-        full sequence is in the timeline.
-      */}
-      <div className="mt-4 pt-4 border-t border-surface-line">
-        <p className="text-xs font-medium text-ink-muted mb-1">Current remarks</p>
-        <p className="text-sm text-ink whitespace-pre-wrap">
-          {currentRemark ?? 'No remarks recorded yet.'}
-        </p>
-      </div>
     </section>
   );
 }
@@ -247,96 +280,85 @@ function ImagePanel({ record, imageUrl }) {
   );
 }
 
-// V-16 — a remark can be added without a status change, and a status can
-// be changed without a remark. Two separate forms, deliberately.
-function ActionsPanel({ record, account, currentStatus, onDone }) {
-  const [remark, setRemark] = useState('');
-  const [status, setStatus] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState(null);
-
-  async function submitRemark(event) {
-    event.preventDefault();
-    setBusy(true);
-    setFeedback(null);
-    const { error } = await addRemark(record.inspection_id, account.id, remark);
-    setBusy(false);
-    if (error) return setFeedback({ tone: 'error', message: error });
-    setRemark('');
-    setFeedback({ tone: 'success', message: 'Remark added.' });
-    onDone();
-  }
-
-  async function submitStatus(event) {
-    event.preventDefault();
-    setBusy(true);
-    setFeedback(null);
-    const { error } = await changeCaseStatus(record.inspection_id, account.id, status);
-    setBusy(false);
-    if (error) return setFeedback({ tone: 'error', message: error });
-    setStatus('');
-    setFeedback({ tone: 'success', message: 'Case status updated.' });
-    onDone();
-  }
-
+// Only the most recent remark is shown. The full sequence is one click away
+// rather than filling the page — but it is never summarised or truncated in
+// a way that hides an entry, since the whole point of the log is that
+// nothing disappears.
+function RemarksPanel({ currentRemark, entryCount, onViewHistory, onCreate }) {
   return (
     <section className="card p-5">
-      <h2 className="mb-4">Record an entry</h2>
+      <h2 className="mb-4">Remarks</h2>
 
-      {feedback && (
-        <div className={`${feedback.tone === 'error' ? 'alert-error' : 'alert-success'} mb-4`}>
-          {feedback.message}
-        </div>
-      )}
+      <div className="rounded-lg border border-surface-line bg-surface-sunken p-3 mb-3">
+        <p className="text-xs font-medium text-ink-muted mb-1">Current remark</p>
+        {currentRemark ? (
+          <>
+            <p className="text-sm text-ink whitespace-pre-wrap">{currentRemark.content}</p>
+            <p className="text-xs text-ink-faint mt-2">
+              {currentRemark.author} · {formatDateTime(currentRemark.at)}
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-ink-faint">No remarks recorded yet.</p>
+        )}
+      </div>
 
-      <form onSubmit={submitRemark} className="space-y-2 mb-5">
-        <label className="label" htmlFor="remark">Add a remark</label>
-        <textarea
-          id="remark"
-          className="input min-h-[80px] resize-y"
-          value={remark}
-          onChange={(e) => setRemark(e.target.value)}
-          placeholder="Observations for this record"
-          maxLength={2000}
-        />
-        <button type="submit" className="btn-primary w-full" disabled={busy || !remark.trim()}>
-          Add remark
+      <div className="flex flex-wrap gap-2">
+        <button className="btn-primary text-xs py-1.5" onClick={onCreate}>
+          Create remark
         </button>
-      </form>
-
-      <form onSubmit={submitStatus} className="space-y-2 pt-5 border-t border-surface-line">
-        <label className="label" htmlFor="status">Change case status</label>
-        <select
-          id="status"
-          className="input"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        >
-          <option value="">Select a status</option>
-          {CASE_STATUSES.filter((s) => s !== currentStatus).map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-        <button type="submit" className="btn-secondary w-full" disabled={busy || !status}>
-          Update status
+        <button className="btn-secondary text-xs py-1.5" onClick={onViewHistory}>
+          View history
+          {entryCount > 0 && <span className="ml-1.5 text-ink-faint">{entryCount}</span>}
         </button>
-      </form>
+      </div>
 
-      <p className="text-xs text-ink-faint mt-4">
-        Entries are permanent. Previous remarks and statuses are never removed
-        or reset.
+      <p className="text-xs text-ink-faint mt-3">
+        Remarks are permanent. Nothing is edited or removed.
       </p>
     </section>
   );
 }
 
-// V-15 — remarks and status changes in one combined chronological
-// timeline. V-14 — every entry carries its author and timestamp.
-function TimelinePanel({ timeline }) {
+// V-16 — a status change is independent of a remark. Separate action,
+// separate dialog; neither requires the other.
+function StatusPanel({ currentStatus, onChange }) {
   return (
     <section className="card p-5">
-      <h2 className="mb-4">Remarks and status history</h2>
+      <h2 className="mb-4">Case status</h2>
 
+      <div className="rounded-lg border border-surface-line bg-surface-sunken p-3 mb-3">
+        <p className="text-xs font-medium text-ink-muted mb-1">Current status</p>
+        <p className="text-sm text-ink">{currentStatus ?? '—'}</p>
+      </div>
+
+      <button className="btn-secondary text-xs py-1.5" onClick={onChange}>
+        Change status
+      </button>
+
+      <p className="text-xs text-ink-faint mt-3">
+        Previous statuses are kept. Changing the status adds an entry rather
+        than replacing one.
+      </p>
+    </section>
+  );
+}
+
+// V-14, V-15 — the combined chronological timeline, with every entry's author
+// and timestamp.
+function HistoryModal({ open, onClose, inspectionId, timeline }) {
+  return (
+    <Modal
+      open={open}
+      title="Remarks and status history"
+      description={`Complete record for ${inspectionId}, oldest first.`}
+      onClose={onClose}
+      footer={
+        <button className="btn-primary" onClick={onClose}>
+          Close
+        </button>
+      }
+    >
       {timeline.length === 0 ? (
         <p className="text-sm text-ink-faint">No entries yet.</p>
       ) : (
@@ -363,6 +385,196 @@ function TimelinePanel({ timeline }) {
           ))}
         </ol>
       )}
-    </section>
+    </Modal>
+  );
+}
+
+// Two steps: compose, then confirm. A remark cannot be edited or deleted
+// once written, so the confirmation is the only chance to catch a mistake.
+function CreateRemarkModal({ open, onClose, inspectionId, accountId, onCreated }) {
+  const [content, setContent] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  function close() {
+    setContent('');
+    setConfirming(false);
+    setError(null);
+    onClose();
+  }
+
+  async function confirmCreate() {
+    setBusy(true);
+    setError(null);
+
+    const { error: createError } = await addRemark(inspectionId, accountId, content);
+    setBusy(false);
+
+    if (createError) {
+      setConfirming(false);
+      setError(createError);
+      return;
+    }
+
+    setContent('');
+    setConfirming(false);
+    onCreated('Remark added.');
+  }
+
+  return (
+    <>
+      <Modal
+        open={open && !confirming}
+        title="Create remark"
+        description={`This will be added to the record for ${inspectionId}.`}
+        onClose={close}
+        footer={
+          <>
+            <button className="btn-secondary" onClick={close}>
+              Cancel
+            </button>
+            <button
+              className="btn-primary"
+              onClick={() => setConfirming(true)}
+              disabled={!content.trim()}
+            >
+              Add remark
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {error && <div className="alert-error">{error}</div>}
+
+          <div>
+            <label className="label" htmlFor="remarkContent">
+              Remark
+            </label>
+            <textarea
+              id="remarkContent"
+              className="input min-h-[120px] resize-y"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Observations for this record"
+              maxLength={2000}
+            />
+            <p className="text-xs text-ink-faint mt-1.5">
+              {content.length}/2000 characters
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={open && confirming}
+        title="Add this remark?"
+        onClose={() => setConfirming(false)}
+        footer={
+          <>
+            <button
+              className="btn-secondary"
+              onClick={() => setConfirming(false)}
+              disabled={busy}
+            >
+              Back
+            </button>
+            <button className="btn-primary" onClick={confirmCreate} disabled={busy}>
+              {busy ? 'Adding…' : 'Yes, add remark'}
+            </button>
+          </>
+        }
+      >
+        <div className="rounded-lg border border-surface-line bg-surface-sunken p-3">
+          <p className="text-sm text-ink whitespace-pre-wrap">{content}</p>
+        </div>
+
+        <p className="text-xs text-ink-faint mt-4">
+          Remarks cannot be edited or removed once added. It will be recorded
+          against your name with the current date and time.
+        </p>
+      </Modal>
+    </>
+  );
+}
+
+function ChangeStatusModal({
+  open,
+  onClose,
+  inspectionId,
+  accountId,
+  currentStatus,
+  onChanged,
+}) {
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  function close() {
+    setStatus('');
+    setError(null);
+    onClose();
+  }
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+
+    const { error: statusError } = await changeCaseStatus(inspectionId, accountId, status);
+    setBusy(false);
+
+    if (statusError) {
+      setError(statusError);
+      return;
+    }
+
+    setStatus('');
+    onChanged(`Case status set to ${status}.`);
+  }
+
+  return (
+    <Modal
+      open={open}
+      title="Change case status"
+      description={`Current status: ${currentStatus ?? '—'}`}
+      onClose={close}
+      footer={
+        <>
+          <button className="btn-secondary" onClick={close} disabled={busy}>
+            Cancel
+          </button>
+          <button className="btn-primary" onClick={submit} disabled={busy || !status}>
+            {busy ? 'Updating…' : 'Update status'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {error && <div className="alert-error">{error}</div>}
+
+        <div>
+          <label className="label" htmlFor="newStatus">
+            New status
+          </label>
+          <select
+            id="newStatus"
+            className="input"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="">Select a status</option>
+            {CASE_STATUSES.filter((s) => s !== currentStatus).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <p className="text-xs text-ink-faint">
+          This adds an entry to the history. The previous status is kept.
+        </p>
+      </div>
+    </Modal>
   );
 }
