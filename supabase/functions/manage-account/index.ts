@@ -69,6 +69,53 @@ function resolveSecretKey(): { key: string | null; source: string } {
   return { key: null, source: 'none' };
 }
 
+
+// Availability across BOTH tables.
+//
+// accounts alone is not enough: an auth user can exist without a matching
+// accounts row, left behind by an earlier partial failure. The client cannot
+// see auth.users, so it cannot make this determination itself — which is why
+// the pre-flight check is an action here rather than a query in the browser.
+async function findClash(admin: any, userId: string, email: string) {
+  const id = String(userId ?? '').trim();
+  const mail = String(email ?? '').trim();
+
+  const { data: rows } = await admin
+    .from('accounts')
+    .select('user_id, email')
+    .or(`user_id.ilike.${id},email.ilike.${mail}`);
+
+  for (const row of rows ?? []) {
+    if (row.user_id.toLowerCase() === id.toLowerCase()) {
+      return `User ID ${id} is already in use. Choose a different one.`;
+    }
+    if (row.email.toLowerCase() === mail.toLowerCase()) {
+      return (
+        `${mail} is already registered to another account. ` +
+        'Each account needs its own email address.'
+      );
+    }
+  }
+
+  const { data: authList } = await admin.auth.admin.listUsers({
+    page: 1,
+    perPage: 200,
+  });
+
+  const taken = (authList?.users ?? []).some(
+    (u: any) => (u.email ?? '').toLowerCase() === mail.toLowerCase(),
+  );
+
+  if (taken) {
+    return (
+      `${mail} is already registered to another account. ` +
+      'Each account needs its own email address.'
+    );
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
@@ -150,6 +197,11 @@ Deno.serve(async (req) => {
     return json({ error: 'Administrator role required.' }, 403);
   }
 
+  if (body.action === 'check') {
+    const clash = await findClash(admin, body.user_id, body.email);
+    return json({ available: !clash, error: clash });
+  }
+
   if (body.action === 'create') {
     const { user_id, email, display_name, role, password } = body;
 
@@ -163,13 +215,30 @@ Deno.serve(async (req) => {
     const pwError = passwordFails(password);
     if (pwError) return json({ error: pwError }, 400);
 
+    const clash = await findClash(admin, user_id, email);
+    if (clash) return json({ error: clash }, 409);
+
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
     });
 
-    if (createError) return json({ error: createError.message }, 400);
+    if (createError) {
+      // The check above can still be raced, and an auth user may exist
+      // without a matching accounts row from an earlier partial failure.
+      if (/already been registered|already exists/i.test(createError.message)) {
+        return json(
+          {
+            error:
+              `${email} is already registered to another account. ` +
+              'Each account needs its own email address.',
+          },
+          409,
+        );
+      }
+      return json({ error: createError.message }, 400);
+    }
 
     const { error: rowError } = await admin.from('accounts').insert({
       id: created.user.id,
@@ -184,6 +253,30 @@ Deno.serve(async (req) => {
     // then match no policy at all — a session that loads nothing.
     if (rowError) {
       await admin.auth.admin.deleteUser(created.user.id);
+
+      if (/accounts_user_id/i.test(rowError.message)) {
+        return json(
+          { error: `User ID ${user_id} is already in use. Choose a different one.` },
+          409,
+        );
+      }
+      if (/accounts_email/i.test(rowError.message)) {
+        return json(
+          { error: `${email} is already registered to another account.` },
+          409,
+        );
+      }
+      if (/user_id_format/i.test(rowError.message)) {
+        return json(
+          {
+            error:
+              'User ID must be 4 to 32 characters, using only letters, ' +
+              'numbers and hyphens.',
+          },
+          400,
+        );
+      }
+
       return json({ error: rowError.message }, 400);
     }
 

@@ -250,6 +250,7 @@ function RecordTable({ records }) {
             <Th>Classification</Th>
             <Th>Case status</Th>
             <Th>Recorded</Th>
+            <Th> </Th>
           </tr>
         </thead>
         <tbody>
@@ -258,14 +259,7 @@ function RecordTable({ records }) {
               key={row.inspection_id}
               className="border-b border-surface-line last:border-0 hover:bg-surface-sunken/60"
             >
-              <Td>
-                <Link
-                  to={`/records/${encodeURIComponent(row.inspection_id)}`}
-                  className="font-mono text-brand-600 hover:text-brand-700"
-                >
-                  {row.inspection_id}
-                </Link>
-              </Td>
+              <Td className="font-mono">{row.inspection_id}</Td>
               <Td>{titleCaseSample(row.sample_type)}</Td>
               <Td>
                 <SourceMarks
@@ -280,6 +274,16 @@ function RecordTable({ records }) {
               <Td><StatusPill value={row.current_case_status} /></Td>
               <Td className="text-ink-muted whitespace-nowrap">
                 {formatDateTime(row.created_at)}
+              </Td>
+              <Td>
+                <div className="flex justify-end">
+                  <Link
+                    to={`/records/${encodeURIComponent(row.inspection_id)}`}
+                    className="btn-secondary text-xs py-1"
+                  >
+                    View
+                  </Link>
+                </div>
               </Td>
             </tr>
           ))}

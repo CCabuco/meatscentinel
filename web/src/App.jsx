@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { RequireAuth, RequireRole, RedirectIfAuthenticated } from './components/RouteGuard.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RecoveryPage from './pages/RecoveryPage.jsx';
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import RecordsPage from './pages/RecordsPage.jsx';
 import RecordDetailPage from './pages/RecordDetailPage.jsx';
@@ -35,6 +36,13 @@ export default function App() {
           </RedirectIfAuthenticated>
         }
       />
+
+      {/*
+        Deliberately unguarded. The recovery link creates a short-lived
+        session, so RedirectIfAuthenticated would bounce the user straight
+        past the form they came here to use.
+      */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         path="/dashboard"

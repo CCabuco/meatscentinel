@@ -2,7 +2,7 @@ import { useState } from 'react';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import PasswordStrength from '../components/PasswordStrength.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { changePassword, updateRecoveryEmail } from '../lib/auth.js';
+import { changePassword, requestEmailChange, validateEmail } from '../lib/auth.js';
 import { evaluatePassword } from '../lib/passwordPolicy.js';
 
 const ROLE_LABEL = {
@@ -11,7 +11,7 @@ const ROLE_LABEL = {
 };
 
 export default function ProfilePage() {
-  const { account, refreshAccount } = useAuth();
+  const { account } = useAuth();
 
   if (!account) return null;
 
@@ -24,7 +24,7 @@ export default function ProfilePage() {
 
       <div className="space-y-6">
         <AccountInformation account={account} />
-        <RecoveryEmail account={account} onSaved={refreshAccount} />
+        <RecoveryEmail account={account} />
         <ChangePassword account={account} />
       </div>
     </AppShell>
@@ -61,19 +61,21 @@ function AccountInformation({ account }) {
 }
 
 // D-07 / D-08 — the registered email is the account recovery contact.
-function RecoveryEmail({ account, onSaved }) {
+function RecoveryEmail({ account }) {
   const [email, setEmail] = useState(account.email);
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const changed = email.trim() !== account.email;
+  const trimmed = email.trim();
+  const changed = trimmed !== account.email;
+  const formatError = changed ? validateEmail(trimmed) : null;
 
   async function handleSubmit(event) {
     event.preventDefault();
     setStatus(null);
     setBusy(true);
 
-    const { error } = await updateRecoveryEmail(account.id, email.trim());
+    const { error } = await requestEmailChange(trimmed);
     setBusy(false);
 
     if (error) {
@@ -81,19 +83,24 @@ function RecoveryEmail({ account, onSaved }) {
       return;
     }
 
+    // The address on file has not changed yet, so the field is reset to the
+    // current one. Showing the new address here would suggest the change had
+    // already taken effect.
+    setEmail(account.email);
     setStatus({
       tone: 'success',
       message:
-        'Email updated. Check the new address for a confirmation message.',
+        `A confirmation link has been sent to ${trimmed}. Your recovery ` +
+        'address changes once you open it.',
     });
-    await onSaved();
   }
 
   return (
     <section className="card p-6">
       <h2 className="mb-1">Recovery email</h2>
       <p className="text-sm text-ink-muted mb-4">
-        Password reset links are sent to this address. Keep it current.
+        Password reset links are sent to this address. Changing it requires
+        confirming the new address first.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
@@ -115,11 +122,23 @@ function RecoveryEmail({ account, onSaved }) {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
+          {formatError && (
+            <p className="text-xs text-state-spoiled mt-1.5">{formatError}</p>
+          )}
         </div>
 
-        <button type="submit" className="btn-primary" disabled={busy || !changed}>
-          {busy ? 'Saving…' : 'Save email'}
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={busy || !changed || Boolean(formatError)}
+        >
+          {busy ? 'Sending…' : 'Send confirmation link'}
         </button>
+
+        <p className="text-xs text-ink-faint">
+          Until the link is opened, reset emails continue going to your current
+          address.
+        </p>
       </form>
     </section>
   );

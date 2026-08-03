@@ -88,6 +88,20 @@ export async function resetAccountPassword(accountId, newPassword) {
 //
 // The token is still verified server-side against the auth service. Sending
 // it in the body does not make it trusted.
+async function invokeManageAccountRaw(body) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  if (!token) return { data: null, error: 'No session.' };
+
+  const { data, error } = await supabase.functions.invoke('manage-account', {
+    body: { ...body, access_token: token },
+  });
+
+  if (error) return { data: null, error: await readFunctionError(error) };
+  return { data, error: null };
+}
+
 async function invokeManageAccount(body) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
@@ -121,4 +135,24 @@ async function readFunctionError(error) {
     // fall through
   }
   return error.message ?? 'That request could not be completed.';
+}
+
+// Pre-flight availability check, run before the confirmation step so the
+// administrator is not asked to confirm something that cannot succeed.
+//
+// This goes through the function rather than querying accounts directly: an
+// auth user can exist without a matching accounts row, left by an earlier
+// partial failure, and the browser cannot see auth.users. Only the server
+// can check both.
+export async function checkAvailability({ userId, email }) {
+  const { data, error } = await invokeManageAccountRaw({
+    action: 'check',
+    user_id: (userId ?? '').trim(),
+    email: (email ?? '').trim(),
+  });
+
+  // Do not block on a failed lookup — let the create attempt decide.
+  if (error) return { error: null };
+
+  return { error: data?.error ?? null };
 }

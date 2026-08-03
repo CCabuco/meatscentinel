@@ -5,12 +5,14 @@ import PasswordInput from '../components/PasswordInput.jsx';
 import Modal from '../components/Modal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { evaluatePassword } from '../lib/passwordPolicy.js';
+import { validateEmail } from '../lib/auth.js';
 import { formatDate, formatDateTime } from '../lib/format.js';
 import {
   listAccounts,
   setAccountActive,
   createAccount,
   resetAccountPassword,
+  checkAvailability,
   ROLES,
   ROLE_LABEL,
 } from '../lib/accounts.js';
@@ -357,14 +359,18 @@ function CreateAccountModal({ open, onClose, onCreated }) {
   const [form, setForm] = useState(empty);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState(null);
 
   const { valid } = evaluatePassword(form.password);
+  const emailError = form.email.trim() ? validateEmail(form.email) : null;
   const complete =
-    form.userId.trim() && form.displayName.trim() && form.email.trim() && valid;
+    form.userId.trim() && form.displayName.trim() && !emailError &&
+    form.email.trim() && valid;
 
   function set(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (key === 'userId' || key === 'email') setError(null);
   }
 
   function close() {
@@ -372,6 +378,28 @@ function CreateAccountModal({ open, onClose, onCreated }) {
     setConfirming(false);
     setError(null);
     onClose();
+  }
+
+  // Verify the User ID and email are free before showing the confirmation.
+  // Advancing first and failing afterwards asks the administrator to confirm
+  // something that was never going to work.
+  async function proceedToConfirm() {
+    setChecking(true);
+    setError(null);
+
+    const { error: clash } = await checkAvailability({
+      userId: form.userId,
+      email: form.email,
+    });
+
+    setChecking(false);
+
+    if (clash) {
+      setError(clash);
+      return;
+    }
+
+    setConfirming(true);
   }
 
   async function confirmCreate() {
@@ -413,10 +441,10 @@ function CreateAccountModal({ open, onClose, onCreated }) {
             </button>
             <button
               className="btn-primary"
-              onClick={() => setConfirming(true)}
-              disabled={!complete}
+              onClick={proceedToConfirm}
+              disabled={!complete || checking}
             >
-              Create account
+              {checking ? 'Checking…' : 'Create account'}
             </button>
           </>
         }
@@ -482,9 +510,13 @@ function CreateAccountModal({ open, onClose, onCreated }) {
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
               />
-              <p className="text-xs text-ink-faint mt-1">
-                Password reset links go here.
-              </p>
+              {emailError ? (
+                <p className="text-xs text-state-spoiled mt-1">{emailError}</p>
+              ) : (
+                <p className="text-xs text-ink-faint mt-1">
+                  Password reset links go here.
+                </p>
+              )}
             </div>
           </div>
 

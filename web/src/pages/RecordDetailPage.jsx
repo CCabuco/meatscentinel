@@ -66,6 +66,7 @@ export default function RecordDetailPage() {
   }
 
   const currentStatus = timeline.filter((e) => e.kind === 'status').at(-1)?.status ?? null;
+  const currentRemark = timeline.filter((e) => e.kind === 'remark').at(-1)?.content ?? null;
 
   return (
     <AppShell>
@@ -85,7 +86,11 @@ export default function RecordDetailPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <FusionPanel record={record} />
-          <DetailPanel record={record} currentStatus={currentStatus} />
+          <DetailPanel
+            record={record}
+            currentStatus={currentStatus}
+            currentRemark={currentRemark}
+          />
           <ImagePanel record={record} imageUrl={imageUrl} />
         </div>
 
@@ -167,7 +172,7 @@ function InputCard({ label, present, valid, value, missingText, invalidText }) {
   );
 }
 
-function DetailPanel({ record, currentStatus }) {
+function DetailPanel({ record, currentStatus, currentRemark }) {
   return (
     <section className="card p-5">
       <h2 className="mb-4">Inspection details</h2>
@@ -185,6 +190,18 @@ function DetailPanel({ record, currentStatus }) {
         <Detail label="External image-based result" value={record.image_result ?? '—'} />
         <Detail label="Current case status" value={currentStatus ?? '—'} />
       </dl>
+
+      {/*
+        The Record Details field list names "current remarks" as its own
+        item, separate from the history. It is the most recent remark; the
+        full sequence is in the timeline.
+      */}
+      <div className="mt-4 pt-4 border-t border-surface-line">
+        <p className="text-xs font-medium text-ink-muted mb-1">Current remarks</p>
+        <p className="text-sm text-ink whitespace-pre-wrap">
+          {currentRemark ?? 'No remarks recorded yet.'}
+        </p>
+      </div>
     </section>
   );
 }
