@@ -1,0 +1,13 @@
+# Core UI
+kivy==2.3.0
+
+# Cloud backend
+supabase==2.4.0
+python-dotenv==1.0.1
+
+# Hardware (Raspberry Pi only — install these ON the Pi, not on a dev laptop).
+# The app auto-falls-back to a mock hardware layer if these are missing,
+# so development/testing works fine on a normal PC without them.
+gpiozero==2.0.1
+RPi.GPIO==0.7.1; platform_machine=='armv7l' or platform_machine=='aarch64'
+spidev==3.6; platform_machine=='armv7l' or platform_machine=='aarch64'
