@@ -1,5 +1,12 @@
-node_modules/
-dist/
 .env
 .env.local
-.supabase/
+node_modules/
+dist/
+**/.vite/
+**/supabase/.temp/
+**/calibration.json
+**/meatscentinel_queue.db
+**/sim_calibration.json
+**/sim_queue.db
+__pycache__/
+*.pyc

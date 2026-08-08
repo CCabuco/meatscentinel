@@ -238,19 +238,18 @@ function Select({ label, value, onChange, options }) {
 function RecordTable({ records }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm min-w-[900px]">
         <thead>
           <tr className="border-b border-surface-line text-left">
             <Th>Inspection ID</Th>
             <Th>Sample</Th>
             <Th>Sources</Th>
-            <Th>NH₃</Th>
-            <Th>H₂S</Th>
+            <Th>Gas readings</Th>
             <Th>Image result</Th>
             <Th>Classification</Th>
             <Th>Case status</Th>
             <Th>Recorded</Th>
-            <Th> </Th>
+            <Th className="w-px" />
           </tr>
         </thead>
         <tbody>
@@ -259,31 +258,34 @@ function RecordTable({ records }) {
               key={row.inspection_id}
               className="border-b border-surface-line last:border-0 hover:bg-surface-sunken/60"
             >
-              <Td className="font-mono">{row.inspection_id}</Td>
-              <Td>{titleCaseSample(row.sample_type)}</Td>
+              <Td>
+                <InspectionId value={row.inspection_id} />
+              </Td>
+              <Td className="whitespace-nowrap">
+                {titleCaseSample(row.sample_type)}
+              </Td>
               <Td>
                 <SourceMarks
                   hasGas={row.has_gas_submission}
                   hasImage={row.has_image_submission}
                 />
               </Td>
-              <Td className="tabular-nums">{formatPpm(row.nh3_ppm)}</Td>
-              <Td className="tabular-nums">{formatPpm(row.h2s_ppm)}</Td>
-              <Td>{row.image_result ?? '—'}</Td>
+              <Td>
+                <GasReadings nh3={row.nh3_ppm} h2s={row.h2s_ppm} />
+              </Td>
+              <Td className="whitespace-nowrap">{row.image_result ?? '—'}</Td>
               <Td><ClassificationBadge value={row.final_classification} /></Td>
               <Td><StatusPill value={row.current_case_status} /></Td>
               <Td className="text-ink-muted whitespace-nowrap">
                 {formatDateTime(row.created_at)}
               </Td>
-              <Td>
-                <div className="flex justify-end">
-                  <Link
-                    to={`/records/${encodeURIComponent(row.inspection_id)}`}
-                    className="btn-secondary text-xs py-1"
-                  >
-                    View
-                  </Link>
-                </div>
+              <Td className="text-right whitespace-nowrap">
+                <Link
+                  to={`/records/${encodeURIComponent(row.inspection_id)}`}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                >
+                  View
+                </Link>
               </Td>
             </tr>
           ))}
@@ -293,9 +295,11 @@ function RecordTable({ records }) {
   );
 }
 
-function Th({ children }) {
+function Th({ children, className = '' }) {
   return (
-    <th className="px-4 py-2.5 text-xs font-medium text-ink-muted whitespace-nowrap">
+    <th
+      className={`px-4 py-3 text-xs font-medium text-ink-muted whitespace-nowrap ${className}`}
+    >
       {children}
     </th>
   );
@@ -303,6 +307,46 @@ function Th({ children }) {
 
 function Td({ children, className = '' }) {
   return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+}
+
+// Inspection IDs are long enough to wrap onto several lines, which made every
+// row three times taller than its content needed. The identifier is shown
+// abbreviated; the full value is available on hover and on the record page,
+// which is where anyone actually needs to read it in full.
+function InspectionId({ value }) {
+  const text = String(value ?? '');
+  const short = text.length > 14 ? `${text.slice(0, 8)}…${text.slice(-4)}` : text;
+
+  return (
+    <span
+      title={text}
+      className="font-mono text-xs text-ink whitespace-nowrap cursor-default"
+    >
+      {short}
+    </span>
+  );
+}
+
+// NH₃ and H₂S occupied two columns and wrapped their units onto a second
+// line. One column, stacked, keeps both readable and gives the table the
+// width it needs for the action button.
+function GasReadings({ nh3, h2s }) {
+  if (nh3 == null && h2s == null) {
+    return <span className="text-ink-faint">—</span>;
+  }
+
+  return (
+    <div className="whitespace-nowrap tabular-nums text-xs leading-tight">
+      <div>
+        <span className="text-ink-faint">NH₃</span>{' '}
+        <span className="text-ink">{formatPpm(nh3)}</span>
+      </div>
+      <div className="mt-0.5">
+        <span className="text-ink-faint">H₂S</span>{' '}
+        <span className="text-ink">{formatPpm(h2s)}</span>
+      </div>
+    </div>
+  );
 }
 
 function EmptyState({ hasFilters }) {
