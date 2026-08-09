@@ -1,10 +1,27 @@
 """
 Supabase integration for Module 5 (Upload Status).
 
-- insert_inspection(): primary REST insert via supabase-py.
-- RealtimeConfirmer: subscribes to INSERT events on `inspections` for this
-  device_id, so the UI can show a genuine "persisted" confirmation rather
-  than just trusting the insert response.
+The schema is owned by the web dashboard team, not this repo — see
+README's "Shared Supabase schema" section for the tables/columns the
+kiosk is allowed to touch and why. In short:
+
+  inspection_records(inspection_id text PK, final_classification, ...)
+    - a database trigger auto-creates one status_entries row the moment
+      this is inserted, so the kiosk must NEVER insert into
+      status_entries itself (doing so would fight the trigger and, since
+      status_entries is append-only, leave duplicate rows forever).
+  gas_submissions(inspection_id text PK+FK->inspection_records,
+    sample_type, nh3_ppm, h2s_ppm, gas_result 'Fresh'|'Spoiled',
+    is_valid, detected_at, received_at default now())
+
+- insert_inspection(): upserts the parent inspection_records row, then
+  inserts the gas_submissions row — but only if one doesn't already exist
+  for this inspection_id, since gas_submissions rejects writes to
+  existing rows ("immutable once received"). That check is what makes
+  retries from the offline queue safe after a partial failure.
+- RealtimeConfirmer: subscribes to INSERT events on gas_submissions and
+  reports back rows so the caller can match against the inspection_id
+  it's currently waiting on.
 - OfflineRetryDaemon: background thread, checks connectivity every N
   seconds, drains the local SQLite offline queue back into Supabase.
 
@@ -14,7 +31,6 @@ backend must never crash the kiosk; it should just queue and retry.
 import logging
 import os
 import threading
-import time
 
 from dotenv import load_dotenv
 
@@ -24,7 +40,8 @@ log = logging.getLogger("meatsentinel.services.supabase")
 
 load_dotenv()
 
-TABLE_NAME = "inspections"
+INSPECTION_RECORDS_TABLE = "inspection_records"
+GAS_SUBMISSIONS_TABLE = "gas_submissions"
 
 
 def _get_client():
@@ -45,12 +62,48 @@ def _get_client():
 
 
 def insert_inspection(record: dict) -> bool:
-    """Attempt a single insert. Returns True on success, False on any failure."""
+    """Write one inspection into the shared schema. Returns True on full
+    success, False on any failure (caller queues for retry).
+
+    inspection_records is upserted — gas_submissions.inspection_id is a
+    foreign key to it, so the parent case row must exist first, and
+    re-upserting the same inspection_id is a harmless no-op.
+
+    gas_submissions itself is NOT upserted: the database rejects any
+    write to an existing row there ("submissions are immutable once
+    received" — it's a measurement event, not editable metadata). So a
+    retry after a successful-but-unconfirmed insert must detect the
+    existing row and treat it as success, rather than trying to upsert
+    (which would just fail the same way every time).
+    """
     client = _get_client()
     if client is None:
         return False
+
     try:
-        client.table(TABLE_NAME).insert(record).execute()
+        inspection_id = record["inspection_id"]
+        client.table(INSPECTION_RECORDS_TABLE).upsert(
+            {"inspection_id": inspection_id}, on_conflict="inspection_id"
+        ).execute()
+
+        existing = (
+            client.table(GAS_SUBMISSIONS_TABLE)
+            .select("inspection_id")
+            .eq("inspection_id", inspection_id)
+            .limit(1)
+            .execute()
+        )
+        if not existing.data:
+            gas_payload = {
+                "inspection_id": inspection_id,
+                "sample_type": record["sample_type"],
+                "nh3_ppm": record.get("nh3_ppm"),
+                "h2s_ppm": record.get("h2s_ppm"),
+                "gas_result": record.get("gas_result"),
+                "is_valid": record["is_valid"],
+                "detected_at": record["detected_at"],
+            }
+            client.table(GAS_SUBMISSIONS_TABLE).insert(gas_payload).execute()
         return True
     except Exception as exc:
         log.warning("Supabase insert failed: %s", exc)
@@ -58,16 +111,18 @@ def insert_inspection(record: dict) -> bool:
 
 
 class RealtimeConfirmer:
-    """Best-effort Realtime subscription that fires a callback when this
-    device's inspection row is confirmed persisted server-side.
+    """Best-effort Realtime subscription that fires a callback whenever a
+    gas_submissions row is confirmed persisted server-side. The caller
+    matches payloads against whatever inspection_id it currently cares
+    about — inspection_id changes every cycle, so filtering happens here
+    rather than being baked into the subscription.
 
     Realtime client APIs vary across supabase-py versions; failures here
     are logged and swallowed rather than crashing the kiosk — REST insert
     success is already a reasonable confirmation on its own.
     """
 
-    def __init__(self, device_id: str, on_confirmed):
-        self.device_id = device_id
+    def __init__(self, on_confirmed):
         self.on_confirmed = on_confirmed
         self._channel = None
 
@@ -76,25 +131,24 @@ class RealtimeConfirmer:
         if client is None:
             return
         try:
-            channel = client.channel(f"inspections-{self.device_id}")
+            channel = client.channel("gas_submissions-inserts")
 
             def _handle_insert(payload):
                 try:
                     row = payload.get("data", {}).get("record", payload.get("new", {}))
-                    if row.get("device_id") == self.device_id:
-                        self.on_confirmed(row)
+                    self.on_confirmed(row)
                 except Exception as exc:
                     log.debug("Realtime payload handling error: %s", exc)
 
             channel.on_postgres_changes(
                 event="INSERT",
                 schema="public",
-                table=TABLE_NAME,
+                table=GAS_SUBMISSIONS_TABLE,
                 callback=_handle_insert,
             )
             channel.subscribe()
             self._channel = channel
-            log.info("Realtime confirmation channel subscribed for device %s", self.device_id)
+            log.info("Realtime confirmation channel subscribed for gas_submissions")
         except Exception as exc:
             log.warning("Realtime subscription unavailable (%s) — REST insert result still used.", exc)
 

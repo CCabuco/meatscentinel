@@ -9,6 +9,7 @@ fine on a regular dev laptop for building/testing the UI and logic.
 import json
 import logging
 import os
+import uuid
 
 os.environ.setdefault("KIVY_NO_ARGS", "1")
 
@@ -109,9 +110,7 @@ class MeatSentinelApp(App):
         self.offline_queue = OfflineQueueStore(os.path.join(BASE_DIR, "offline_queue.db"))
 
         # Realtime confirmation (Module 5.6) — best effort, never blocks the UI.
-        self.realtime_confirmer = RealtimeConfirmer(
-            self.device_id, on_confirmed=self._on_realtime_confirmed
-        )
+        self.realtime_confirmer = RealtimeConfirmer(on_confirmed=self._on_realtime_confirmed)
         self.realtime_confirmer.start()
 
         # Offline retry daemon (Module 5.4)
@@ -150,13 +149,15 @@ class MeatSentinelApp(App):
         return sm
 
     def reset_inspection_state(self):
+        self.inspection_id = str(uuid.uuid4())
         self.selected_meat_type = None
         self.selected_thresholds = None
         self.detection_result = None
         self.current_record = None
 
     def _on_realtime_confirmed(self, row):
-        self.log.info("Realtime confirmation received for record id=%s", row.get("id"))
+        if row.get("inspection_id") == self.inspection_id:
+            self.log.info("Realtime confirmation received for inspection_id=%s", self.inspection_id)
 
     def show_fatal_error(self, message: str):
         error_screen = self.screen_manager.get_screen("error")

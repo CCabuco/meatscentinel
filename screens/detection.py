@@ -99,6 +99,7 @@ class DetectionScreen(Screen):
             "avg_h2s_ppm": avg_h2s,
             "invalid": invalid,
             "invalid_reason": reason,
+            "finished_at": time.time(),
         }
 
         self.manager.current = "result"

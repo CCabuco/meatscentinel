@@ -1,5 +1,6 @@
 """Module 4 — Gas-Based Result & Invalid Reading Display."""
 import time
+from datetime import datetime, timezone
 
 from kivy.app import App
 from kivy.uix.screenmanager import Screen
@@ -20,7 +21,8 @@ class ResultScreen(Screen):
         self.ids.h2s_value.text = f"{avg_h2s:.2f} ppm" if avg_h2s is not None else "—"
 
         if invalid:
-            verdict = "invalid"
+            gas_result = None
+            is_valid = False
             self.ids.verdict_label.text = "Invalid Reading"
             self.ids.verdict_label.color = (0.55, 0.44, 0.44, 1)
             reason = detection.get("invalid_reason")
@@ -34,8 +36,10 @@ class ResultScreen(Screen):
             h2s_over = avg_h2s is not None and avg_h2s > thresholds["h2s_max_ppm"]
             spoiled = nh3_over or h2s_over
 
-            verdict = "spoiled" if spoiled else "fresh"
-            self.ids.verdict_label.text = "Spoiled" if spoiled else "Fresh"
+            # 'Fresh' / 'Spoiled' matches the shared gas_result enum exactly.
+            gas_result = "Spoiled" if spoiled else "Fresh"
+            is_valid = True
+            self.ids.verdict_label.text = gas_result
             self.ids.verdict_label.color = (0.85, 0.25, 0.25, 1) if spoiled else (0.25, 0.75, 0.35, 1)
             self.ids.verdict_hint.text = (
                 f"Thresholds for {thresholds['label']}: "
@@ -43,17 +47,20 @@ class ResultScreen(Screen):
                 f"H[sub]2[/sub]S ≤ {thresholds['h2s_max_ppm']} ppm."
             )
 
-        # 4.6 — build the inspection record in memory for Module 5.
+        detected_at = datetime.fromtimestamp(
+            detection.get("finished_at", time.time()), tz=timezone.utc
+        ).isoformat()
+
+        # 4.6 — build the record for Module 5, shaped for the shared
+        # Supabase schema (inspection_records + gas_submissions).
         app.current_record = {
-            "device_id": app.device_id,
-            "created_at": None,  # left for server default / set at upload time
-            "meat_type": meat_type,
-            "avg_nh3_ppm": avg_nh3,
-            "avg_h2s_ppm": avg_h2s,
-            "gas_result": verdict,
-            "raw_readings": detection["readings"],
-            "upload_source": "kiosk",
-            "_local_captured_at": time.time(),
+            "inspection_id": app.inspection_id,
+            "sample_type": meat_type,
+            "nh3_ppm": avg_nh3,
+            "h2s_ppm": avg_h2s,
+            "gas_result": gas_result,
+            "is_valid": is_valid,
+            "detected_at": detected_at,
         }
 
     def continue_to_upload(self):
