@@ -1,0 +1,28 @@
+# Core UI
+kivy==2.3.0
+
+# Cloud backend
+supabase==2.31.0
+httpx==0.27.2
+# realtime==2.31.0 (pulled in by supabase) imports websockets.asyncio,
+# which only exists from websockets 13 onward — but realtime's own
+# declared range (>=11,<16) doesn't guarantee that, so an unpinned
+# install can still resolve websockets 12.x and crash every Supabase
+# client build with "No module named 'websockets.asyncio'".
+websockets>=13,<16
+python-dotenv==1.0.1
+
+# Note: Realtime confirmation (services/supabase_client.py
+# RealtimeConfirmer) will still log a harmless warning and no-op even
+# with these versions — supabase-py's *sync* client (what this kiosk
+# uses everywhere) explicitly doesn't support Realtime; only the async
+# client does. This is a known, accepted limitation: the REST insert
+# result already gives the kiosk a reliable, synchronous success/failure
+# signal, which is what actually drives the upload UI.
+
+# Hardware (Raspberry Pi only — install these ON the Pi, not on a dev laptop).
+# The app auto-falls-back to a mock hardware layer if these are missing,
+# so development/testing works fine on a normal PC without them.
+gpiozero==2.0.1
+RPi.GPIO==0.7.1; platform_machine=='armv7l' or platform_machine=='aarch64'
+spidev==3.6; platform_machine=='armv7l' or platform_machine=='aarch64'

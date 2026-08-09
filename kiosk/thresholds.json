@@ -1,0 +1,17 @@
+{
+  "chicken": {
+    "label": "Raw Chicken",
+    "nh3_max_ppm": 25.0,
+    "h2s_max_ppm": 5.0
+  },
+  "pork": {
+    "label": "Raw Pork",
+    "nh3_max_ppm": 30.0,
+    "h2s_max_ppm": 6.0
+  },
+  "beef": {
+    "label": "Raw Beef",
+    "nh3_max_ppm": 35.0,
+    "h2s_max_ppm": 7.0
+  }
+}

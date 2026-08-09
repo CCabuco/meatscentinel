@@ -1,0 +1,38 @@
+#:kivy 2.3.0
+
+<UploadScreen>:
+    KioskScreenRoot:
+        KioskTitle:
+            text: 'Saving Inspection Record'
+
+        BoxLayout:
+            orientation: 'vertical'
+            spacing: Window.height * 0.015
+
+            UploadFlyer:
+                id: status_icon
+                folder_color: COLOR_ACCENT_STRONG
+                icon_color: COLOR_TEXT_MUTED
+
+            Label:
+                id: status_label
+                text: 'Uploading…'
+                font_size: Window.height * 0.05
+                color: COLOR_TEXT
+                size_hint_y: None
+                height: Window.height * 0.08
+
+            Label:
+                id: retry_note
+                text: ''
+                font_size: Window.height * 0.035
+                color: COLOR_TEXT_MUTED
+                size_hint_y: None
+                height: Window.height * 0.06
+                text_size: self.width, None
+                halign: 'center'
+
+        PrimaryButton:
+            id: ventilate_btn
+            text: 'Ventilate Chamber'
+            on_release: root.go_to_ventilation()
