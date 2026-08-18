@@ -10,63 +10,90 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [deactivated, setDeactivated] = useState(false);
 
-  // AD-02 / U-F — deactivation is immediate.
+  // 'anonymous' | 'active' | 'unverified' | 'deactivated' | 'unknown'.
+  // The route guards need this: without it, a session that is signed in
+  // but unverified looks identical to one whose account is still loading,
+  // and the guards would show a loading screen that never resolves.
+  const [sessionState, setSessionState] = useState('anonymous');
+
+  // AD-02 / U-F — deactivation is immediate. Every RLS policy requires
+  // is_active, so a deactivated user's own row becomes unreadable the
+  // moment the flag flips, even though their token has not expired.
   //
-  // Row Level Security requires is_active on every policy, including the
-  // one on accounts. So a deactivated user's own row becomes unreadable
-  // the instant the flag flips, even though their token has not expired.
-  // No row means deactivated: sign out rather than render a shell the
-  // user cannot load anything into.
-  // AD-02 / U-F — deactivation is immediate.
+  // This used to be inferred: "signed in but the accounts row returned
+  // zero rows" meant deactivated. Migration 010 made that inference
+  // wrong. current_account_role() now also requires a verified session,
+  // so THREE different situations return zero rows:
   //
-  // Every RLS policy requires is_active, including the one on accounts, so a
-  // deactivated user's own row becomes unreadable the moment the flag flips.
-  // "Signed in but no row" therefore means deactivated — but ONLY when the
-  // query genuinely returned no row. A query that ERRORED (network hiccup,
-  // token still settling in the first moments after sign-in) proves nothing,
-  // and signing out on it produced a flash of the landing page followed by a
-  // bounce back to login. Errors now retry once, then leave the session
-  // alone; the route guards keep unauthorised screens unreachable either way.
+  //   - deactivated              → sign out, say so
+  //   - unverified session       → a recovery link or an email-change
+  //                                confirmation. Signing out here would
+  //                                break password recovery entirely,
+  //                                because the reset form needs that
+  //                                session to set the new password.
+  //   - a genuine error          → prove nothing, keep what we had
+  //
+  // So the client stops inferring and asks. login_session_state() is
+  // security definer and answers regardless of policy.
   const loadSeq = useRef(0);
 
   const loadAccount = useCallback(async (userId) => {
     if (!userId) {
       setAccount(null);
+      setSessionState('anonymous');
       return;
     }
 
     const seq = ++loadSeq.current;
 
-    const attempt = () =>
-      supabase
-        .from('accounts')
-        .select('id, user_id, email, display_name, role, is_active, created_at')
-        .eq('id', userId)
-        .maybeSingle();
+    const { data: state, error: stateError } = await supabase.rpc(
+      'login_session_state',
+    );
 
-    let { data, error } = await attempt();
-
-    if (error) {
-      await new Promise((r) => setTimeout(r, 400));
-      if (seq !== loadSeq.current) return;
-      ({ data, error } = await attempt());
-    }
-
-    // A newer load has started (another auth event fired); let it win rather
-    // than racing it to setState.
     if (seq !== loadSeq.current) return;
 
-    if (error) {
-      // Could not determine anything. Keep whatever we had; do not sign out
-      // on a failed lookup.
+    if (stateError) {
+      setSessionState('unknown');
+      // Could not determine anything. Keep whatever we had; never sign
+      // out on a failed lookup — that was the bug that bounced valid
+      // logins back to the login page.
       return;
     }
 
-    if (!data) {
-      // Clean answer, zero rows: the policies refused. Deactivated.
+    setSessionState(state ?? 'unknown');
+
+    if (state === 'deactivated') {
       setAccount(null);
       setDeactivated(true);
       await doSignOut();
+      return;
+    }
+
+    if (state === 'unverified') {
+      // Not signed in as far as the application is concerned, but the
+      // session is left alone so /reset-password and /email-changed can
+      // use it. Both routes are unguarded, so nothing else is reachable.
+      setAccount(null);
+      setDeactivated(false);
+      return;
+    }
+
+    if (state !== 'active') {
+      setAccount(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('id, user_id, email, display_name, role, is_active, created_at')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (seq !== loadSeq.current) return;
+
+    if (error || !data) {
+      // The state check just said active, so a miss here is a transient
+      // failure rather than a verdict. Leave the session alone.
       return;
     }
 
@@ -91,6 +118,7 @@ export function AuthProvider({ children }) {
         await loadAccount(next.user.id);
       } else {
         setAccount(null);
+        setSessionState('anonymous');
       }
       if (active) setLoading(false);
     });
@@ -109,6 +137,7 @@ export function AuthProvider({ children }) {
     await doSignOut();
     setAccount(null);
     setSession(null);
+    setSessionState('anonymous');
   }, []);
 
   const value = {
@@ -116,6 +145,7 @@ export function AuthProvider({ children }) {
     account,
     loading,
     deactivated,
+    sessionState,
     clearDeactivated: () => setDeactivated(false),
     role: account?.role ?? null,
     isInspector: account?.role === 'inspector',

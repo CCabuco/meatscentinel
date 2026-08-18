@@ -5,19 +5,27 @@ import { useAuth } from '../context/AuthContext.jsx';
 //
 // The real boundary is Row Level Security (AD-05): an administrator's
 // token reads nothing from the inspection tables regardless of what the
-// client requests. These guards exist so people do not land on screens
-// that would render empty for them.
+// client requests, and since 010 an unverified token reads nothing from
+// anywhere. These guards exist so people do not land on screens that
+// would render empty for them.
 //
 // One state needs care: a session that exists while its account row is
 // still being fetched. Supabase fires several auth events in quick
 // succession on sign-in and on refresh, and the account load resolves a
 // beat after the session does. Treating that beat as "not logged in"
 // flashed the login page on every refresh. Session-without-account is a
-// LOADING state, not a logged-out one — unless the load concluded the
-// account is deactivated, which signs out and clears the session anyway.
+// LOADING state, not a logged-out one.
+//
+// LV — with the verification step there is now a second, permanent way
+// to be session-without-account: an unverified session, which is what a
+// recovery link and an email-change confirmation produce. That is NOT a
+// loading state and never resolves into one. Without the sessionState
+// check below, visiting /login while holding one would show a loading
+// screen forever.
 
-function stillResolving({ loading, session, account, deactivated }) {
+function stillResolving({ loading, session, account, deactivated, sessionState }) {
   if (loading) return true;
+  if (sessionState === 'unverified') return false;
   if (session && !account && !deactivated) return true;
   return false;
 }
@@ -45,6 +53,9 @@ export function RequireRole({ role, children }) {
   return children;
 }
 
+// An unverified session is deliberately allowed to sit on /login rather
+// than being redirected: the user holding one has not completed sign-in,
+// so the login form is exactly where they belong.
 export function RedirectIfAuthenticated({ children }) {
   const auth = useAuth();
 
