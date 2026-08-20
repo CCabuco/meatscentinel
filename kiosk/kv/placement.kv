@@ -1,0 +1,41 @@
+#:kivy 2.3.0
+
+<PlacementScreen>:
+    KioskScreenRoot:
+        KioskTitle:
+            text: 'Place Sample in Chamber'
+        KioskSubtitle:
+            text: 'Detection will only start once a sample is confirmed.'
+
+        BoxLayout:
+            orientation: 'vertical'
+            spacing: Window.height * 0.015
+
+            FloatLayout:
+                LoadingSpinner:
+                    id: chamber_icon
+                    size_hint: None, None
+                    size: Window.height * 0.2, Window.height * 0.2
+                    line_width: Window.height * 0.018
+                    track_color: COLOR_SURFACE
+                    active_color: COLOR_TEXT_MUTED
+                    done_color: COLOR_ACCENT_STRONG
+                    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
+            Label:
+                id: status_label
+                text: 'Waiting for sample'
+                font_size: Window.height * 0.055
+                color: COLOR_TEXT
+                size_hint_y: None
+                height: Window.height * 0.08
+
+        SecondaryButton:
+            text: 'Simulate Sample Placement (dev/mock mode)'
+            on_release: root.simulate_place_sample()
+
+        PrimaryButton:
+            id: start_detection_btn
+            text: 'Start Detection'
+            disabled: True
+            on_release: root.go_to_detection()

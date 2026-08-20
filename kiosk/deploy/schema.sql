@@ -1,0 +1,51 @@
+-- Reference only — DO NOT RUN.
+--
+-- This project no longer owns the Supabase schema. The kiosk shares a
+-- database with the MeatSentinel web dashboard, and the schema (tables,
+-- enums, RLS policies, triggers) is created and migrated from the web
+-- app's repo. If you need to stand up a fresh Supabase project, get the
+-- real migration from there — this file is kept only so kiosk developers
+-- can see, at a glance, the shape of the two tables the kiosk actually
+-- writes to.
+--
+-- kiosk write path (see services/supabase_client.py):
+--   1. upsert inspection_records(inspection_id)
+--      -> a trigger on this table auto-creates one status_entries row
+--         (status='Open'). The kiosk must NEVER insert into
+--         status_entries itself — it's append-only, so a duplicate
+--         insert can't even be cleaned up later.
+--   2. insert gas_submissions(inspection_id, sample_type, nh3_ppm,
+--      h2s_ppm, gas_result, is_valid, detected_at) — only if a row for
+--      this inspection_id doesn't already exist; the table rejects
+--      writes to existing rows ("immutable once received"), so a retry
+--      must check first instead of upserting.
+--
+-- inspection_records
+--   inspection_id        text PRIMARY KEY   -- CHECK inspection_id_format;
+--                                            -- plain UUIDs pass it, the kiosk
+--                                            -- generates one per inspection.
+--   final_classification public.final_classification  -- 'Fresh'|'Spoiled'|'For Review'
+--                                            -- set by the web app (combines
+--                                            -- gas + image results), never by
+--                                            -- the kiosk.
+--   classified_at         timestamptz
+--   created_at            timestamptz DEFAULT now()
+--
+-- gas_submissions
+--   inspection_id  text PRIMARY KEY REFERENCES inspection_records(inspection_id)
+--   sample_type    public.sample_type NOT NULL   -- 'chicken'|'pork'|'beef'
+--   nh3_ppm        numeric
+--   h2s_ppm        numeric
+--   gas_result     public.source_result           -- 'Fresh'|'Spoiled' — null when is_valid=false
+--   is_valid       boolean NOT NULL
+--   detected_at    timestamptz NOT NULL            -- when the kiosk's reading finished
+--   received_at    timestamptz DEFAULT now()       -- left to the server default
+--
+-- image_submissions, accounts, status_entries, remarks, login_lookup_attempts
+-- and the inspection_records_view exist too, but the kiosk never reads or
+-- writes them directly.
+--
+-- Realtime: if you want the kiosk's best-effort upload confirmation
+-- (services.supabase_client.RealtimeConfirmer) to work, enable Realtime on
+-- gas_submissions from the Supabase dashboard (Database > Replication), or:
+--   ALTER PUBLICATION supabase_realtime ADD TABLE gas_submissions;

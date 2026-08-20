@@ -1,0 +1,38 @@
+#:kivy 2.3.0
+
+<SampleSelectionScreen>:
+    KioskScreenRoot:
+        KioskTitle:
+            text: 'Select Sample Type'
+        KioskSubtitle:
+            text: 'Thresholds are meat-type specific.'
+
+        BoxLayout:
+            spacing: Window.width * 0.025
+
+            MeatTile:
+                id: chicken_tile
+                group: 'meat_type'
+                meat_type: 'chicken'
+                label_text: 'Raw Chicken'
+                on_release: root.select_type('chicken')
+
+            MeatTile:
+                id: pork_tile
+                group: 'meat_type'
+                meat_type: 'pork'
+                label_text: 'Raw Pork'
+                on_release: root.select_type('pork')
+
+            MeatTile:
+                id: beef_tile
+                group: 'meat_type'
+                meat_type: 'beef'
+                label_text: 'Raw Beef'
+                on_release: root.select_type('beef')
+
+        PrimaryButton:
+            id: continue_btn
+            text: 'Continue'
+            disabled: True
+            on_release: root.go_to_placement()

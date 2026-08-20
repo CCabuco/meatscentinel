@@ -1,0 +1,80 @@
+#:kivy 2.3.0
+
+<ResultScreen>:
+    KioskScreenRoot:
+        spacing: Window.height * 0.015
+
+        KioskTitle:
+            text: 'Inspection Result'
+            height: Window.height * 0.1
+            font_size: Window.height * 0.06
+
+        BoxLayout:
+            spacing: Window.width * 0.025
+            size_hint_y: None
+            height: Window.height * 0.2
+
+            StatCard:
+                orientation: 'vertical'
+                KioskSubtitle:
+                    markup: True
+                    text: 'Avg NH[sub]3[/sub]'
+                    font_size: Window.height * 0.035
+                    height: Window.height * 0.045
+                Label:
+                    id: nh3_value
+                    text: '—'
+                    font_size: Window.height * 0.06
+                    bold: True
+                    color: COLOR_TEXT
+
+            StatCard:
+                orientation: 'vertical'
+                KioskSubtitle:
+                    markup: True
+                    text: 'Avg H[sub]2[/sub]S'
+                    font_size: Window.height * 0.035
+                    height: Window.height * 0.045
+                Label:
+                    id: h2s_value
+                    text: '—'
+                    font_size: Window.height * 0.06
+                    bold: True
+                    color: COLOR_TEXT
+
+        Label:
+            id: verdict_label
+            text: ''
+            font_size: Window.height * 0.11
+            bold: True
+            size_hint_y: None
+            height: Window.height * 0.16
+
+        Label:
+            id: verdict_hint
+            markup: True
+            text: ''
+            font_size: Window.height * 0.036
+            color: COLOR_TEXT_MUTED
+            size_hint_y: None
+            height: Window.height * 0.09
+            text_size: self.width, None
+            halign: 'center'
+
+        Widget:
+            size_hint_y: 1
+
+        Label:
+            text: 'Local gas-based result — combined classification available in the web app.'
+            font_size: Window.height * 0.028
+            italic: True
+            color: COLOR_TEXT_FAINT
+            size_hint_y: None
+            height: Window.height * 0.06
+            text_size: self.width, None
+            halign: 'center'
+
+        PrimaryButton:
+            text: 'Continue'
+            height: Window.height * 0.13
+            on_release: root.continue_to_upload()

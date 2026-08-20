@@ -1,0 +1,32 @@
+#:kivy 2.3.0
+
+<DetectionScreen>:
+    KioskScreenRoot:
+        KioskTitle:
+            text: 'Gas Detection in Progress'
+        KioskSubtitle:
+            text: 'Please do not open the chamber.'
+
+        FloatLayout:
+            ProgressRing:
+                id: ring
+                size_hint: None, None
+                size: Window.height * 0.55, Window.height * 0.55
+                line_width: Window.height * 0.035
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
+            Label:
+                id: percent_label
+                text: '0%'
+                font_size: Window.height * 0.09
+                bold: True
+                color: COLOR_TEXT
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
+        Label:
+            id: status_label
+            text: 'Warming up sensors…'
+            font_size: Window.height * 0.045
+            color: COLOR_TEXT_MUTED
+            size_hint_y: None
+            height: Window.height * 0.07
