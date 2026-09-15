@@ -1,0 +1,32 @@
+#:kivy 2.3.0
+
+<ErrorScreen>:
+    KioskScreenRoot:
+        Widget:
+            size_hint_y: 1
+
+        Label:
+            text: '⚠️'
+            font_size: Window.height * 0.15
+            size_hint_y: None
+            height: Window.height * 0.2
+
+        KioskTitle:
+            text: 'Something went wrong'
+
+        Label:
+            id: error_message
+            text: ''
+            font_size: Window.height * 0.04
+            color: COLOR_TEXT_MUTED
+            size_hint_y: None
+            height: Window.height * 0.2
+            text_size: self.width, None
+            halign: 'center'
+
+        Widget:
+            size_hint_y: 1
+
+        PrimaryButton:
+            text: 'Restart App'
+            on_release: root.restart_app()

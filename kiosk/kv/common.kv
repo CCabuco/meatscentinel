@@ -1,0 +1,153 @@
+#:kivy 2.3.0
+#:import Window kivy.core.window.Window
+
+# --- Palette (source: #FCF8F8, #FBEFEF, #F9DFDF, #F5AFAF) ------------------
+#:set COLOR_BG (0.9882, 0.9725, 0.9725, 1)
+#:set COLOR_SURFACE (0.9843, 0.9373, 0.9373, 1)
+#:set COLOR_SURFACE_ALT (0.9765, 0.8745, 0.8745, 1)
+#:set COLOR_ACCENT (0.9608, 0.6863, 0.6863, 1)
+#:set COLOR_ACCENT_STRONG (0.80, 0.55, 0.55, 1)
+#:set COLOR_TEXT (0.18, 0.13, 0.13, 1)
+#:set COLOR_TEXT_MUTED (0.55, 0.44, 0.44, 1)
+#:set COLOR_TEXT_FAINT (0.68, 0.58, 0.58, 1)
+#:set COLOR_DANGER (0.84, 0.27, 0.27, 1)
+#:set COLOR_DANGER_PRESSED (0.725, 0.212, 0.212, 1)
+
+# --- Responsive scale --------------------------------------------------------
+# Every size below is expressed as a fraction of Window.width/height instead
+# of a fixed dp/sp value, tuned against a 480x320 3.5" touchscreen baseline
+# (see Window.size in main.py). That keeps proportions correct if the panel
+# turns out to be a slightly different resolution, and it scales cleanly on
+# a bigger dev monitor while prototyping.
+
+<KioskLabel@Label>:
+    color: COLOR_TEXT
+    font_size: Window.height * 0.06
+
+<KioskTitle@Label>:
+    color: COLOR_TEXT
+    font_size: Window.height * 0.075
+    bold: True
+    size_hint_y: None
+    height: Window.height * 0.13
+    text_size: self.width, None
+    halign: 'center'
+    valign: 'middle'
+
+<KioskSubtitle@Label>:
+    color: COLOR_TEXT_MUTED
+    font_size: Window.height * 0.045
+    size_hint_y: None
+    height: Window.height * 0.08
+    text_size: self.width, None
+    halign: 'center'
+    valign: 'middle'
+
+<PrimaryButton@ButtonBehavior+Label>:
+    color: COLOR_TEXT if not self.disabled else COLOR_TEXT_MUTED
+    font_size: Window.height * 0.055
+    bold: True
+    size_hint_y: None
+    height: Window.height * 0.15
+    text_size: self.width - Window.width * 0.06, None
+    halign: 'center'
+    valign: 'middle'
+    canvas.before:
+        Color:
+            rgba: (COLOR_SURFACE_ALT if self.disabled else (COLOR_ACCENT_STRONG if self.state == 'down' else COLOR_ACCENT))
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [Window.height * 0.045,]
+
+<SecondaryButton@ButtonBehavior+Label>:
+    color: COLOR_TEXT_MUTED if self.disabled else COLOR_TEXT
+    font_size: Window.height * 0.048
+    size_hint_y: None
+    height: Window.height * 0.13
+    text_size: self.width - Window.width * 0.06, None
+    halign: 'center'
+    valign: 'middle'
+    canvas.before:
+        Color:
+            rgba: COLOR_SURFACE_ALT if (self.disabled or self.state == 'down') else COLOR_SURFACE
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [Window.height * 0.04,]
+        Color:
+            rgba: COLOR_SURFACE_ALT
+        Line:
+            rounded_rectangle: [self.x, self.y, self.width, self.height, Window.height * 0.04]
+            width: 1.1
+
+<DangerButton@ButtonBehavior+Label>:
+    color: COLOR_TEXT_MUTED if self.disabled else (1, 1, 1, 1)
+    font_size: Window.height * 0.048
+    bold: True
+    size_hint_y: None
+    height: Window.height * 0.13
+    text_size: self.width - Window.width * 0.06, None
+    halign: 'center'
+    valign: 'middle'
+    canvas.before:
+        Color:
+            rgba: COLOR_SURFACE_ALT if self.disabled else (COLOR_DANGER_PRESSED if self.state == 'down' else COLOR_DANGER)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [Window.height * 0.04,]
+
+<KioskScreenRoot@BoxLayout>:
+    orientation: 'vertical'
+    padding: Window.width * 0.03, Window.height * 0.035
+    spacing: Window.height * 0.022
+    canvas.before:
+        Color:
+            rgba: COLOR_BG
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+<StatCard@BoxLayout>:
+    orientation: 'vertical'
+    padding: Window.width * 0.018, Window.height * 0.012
+    canvas.before:
+        Color:
+            rgba: COLOR_SURFACE
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [Window.height * 0.05,]
+
+<MeatTile>:
+    orientation: 'vertical'
+    padding: Window.width * 0.015, Window.height * 0.02
+    spacing: Window.height * 0.015
+    canvas.before:
+        Color:
+            rgba: COLOR_ACCENT if self.state == 'down' else COLOR_SURFACE
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [Window.height * 0.06,]
+        Color:
+            rgba: (0, 0, 0, 0) if self.state == 'down' else COLOR_SURFACE_ALT
+        Line:
+            rounded_rectangle: [self.x, self.y, self.width, self.height, Window.height * 0.06]
+            width: 1.2
+
+    Image:
+        source: 'assets/icons/' + root.meat_type + '.png'
+        color: COLOR_TEXT if root.state == 'down' else COLOR_TEXT_MUTED
+        allow_stretch: True
+        keep_ratio: True
+        size_hint_y: 0.62
+
+    Label:
+        text: root.label_text
+        color: COLOR_TEXT if root.state == 'down' else COLOR_TEXT_MUTED
+        font_size: Window.height * 0.042
+        bold: root.state == 'down'
+        size_hint_y: 0.24
+        halign: 'center'

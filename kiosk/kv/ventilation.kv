@@ -1,0 +1,56 @@
+#:kivy 2.3.0
+
+<VentilationScreen>:
+    KioskScreenRoot:
+        spacing: Window.height * 0.014
+
+        KioskTitle:
+            text: 'Chamber Ventilation'
+            height: Window.height * 0.12
+            font_size: Window.height * 0.065
+
+        FloatLayout:
+            ProgressRing:
+                id: ring
+                ring_color: COLOR_ACCENT
+                size_hint: None, None
+                size: Window.height * 0.36, Window.height * 0.36
+                line_width: Window.height * 0.028
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
+            Label:
+                id: percent_label
+                text: '0%'
+                font_size: Window.height * 0.07
+                bold: True
+                color: COLOR_TEXT
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+
+        Label:
+            id: status_label
+            text: 'Ready to ventilate'
+            font_size: Window.height * 0.035
+            color: COLOR_TEXT_MUTED
+            size_hint_y: None
+            height: Window.height * 0.06
+
+        PrimaryButton:
+            id: start_stop_btn
+            text: 'Start Ventilation'
+            height: Window.height * 0.14
+            on_release: root.toggle_ventilation()
+
+        SecondaryButton:
+            id: new_inspection_btn
+            text: 'New Inspection'
+            height: Window.height * 0.12
+            disabled: True
+            on_release: root.new_inspection()
+
+        Label:
+            text: 'Not a substitute for cleaning or sterilization.'
+            font_size: Window.height * 0.026
+            italic: True
+            color: COLOR_TEXT_FAINT
+            size_hint_y: None
+            height: Window.height * 0.05
