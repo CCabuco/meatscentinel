@@ -18,10 +18,69 @@ const ROLE_LABEL = {
   administrator: 'Administrator',
 };
 
+// Small inline icons rather than an icon library dependency — keeps this
+// page from requiring a package that may not already be installed.
+function IconUser(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.75" stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+    </svg>
+  );
+}
+function IconMail(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.75" stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+    </svg>
+  );
+}
+function IconLock(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.75" stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+    </svg>
+  );
+}
+function IconSmallLock(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+    </svg>
+  );
+}
+
+function SectionIcon({ tone = 'brand', children }) {
+  const toneClasses = {
+    brand: 'bg-brand-50 text-brand-600',
+    ink: 'bg-surface-sunken text-ink-muted',
+  }[tone];
+  return (
+    <span
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-lg shrink-0 ${toneClasses}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SectionHeading({ icon, title, description }) {
+  return (
+    <div className="flex items-start gap-3 mb-4">
+      {icon}
+      <div>
+        <h2 className="mb-0.5">{title}</h2>
+        {description && <p className="text-sm text-ink-muted">{description}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { account } = useAuth();
 
   if (!account) return null;
+
+  const initial = (account.display_name || account.user_id || '?').trim().charAt(0).toUpperCase();
 
   return (
     <AppShell>
@@ -31,6 +90,27 @@ export default function ProfilePage() {
       />
 
       <div className="space-y-6">
+        {/* Identity header — orients the page around the person, not just a
+            stack of forms. Purely presentational; no new state or logic. */}
+        <section className="card p-6 flex items-center gap-4">
+          <span className="h-14 w-14 rounded-full bg-brand-100 text-brand-700 grid place-items-center text-lg font-semibold shrink-0">
+            {initial}
+          </span>
+          <div className="min-w-0">
+            <p className="text-base font-medium text-ink truncate">
+              {account.display_name}
+            </p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-xs font-mono text-ink-faint px-2 py-0.5 rounded-md bg-surface-sunken">
+                {account.user_id}
+              </span>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-brand-50 text-brand-700">
+                {ROLE_LABEL[account.role] ?? account.role}
+              </span>
+            </div>
+          </div>
+        </section>
+
         <AccountInformation account={account} />
         <RecoveryEmail account={account} />
         <ChangePassword account={account} />
@@ -45,26 +125,49 @@ export default function ProfilePage() {
 function AccountInformation({ account }) {
   return (
     <section className="card p-6">
-      <h2 className="mb-4">Account information</h2>
+      <SectionHeading
+        icon={
+          <SectionIcon tone="ink">
+            <IconUser className="h-4.5 w-4.5" />
+          </SectionIcon>
+        }
+        title="Account information"
+      />
       <div className="grid sm:grid-cols-3 gap-4">
-        <div>
-          <p className="label">User ID</p>
-          <p className="readonly-value font-mono">{account.user_id}</p>
-        </div>
-        <div>
-          <p className="label">Display name</p>
-          <p className="readonly-value">{account.display_name}</p>
-        </div>
-        <div>
-          <p className="label">Account type</p>
-          <p className="readonly-value">{ROLE_LABEL[account.role] ?? account.role}</p>
-        </div>
+        <ReadOnlyField label="User ID" value={account.user_id} mono />
+        <ReadOnlyField label="Display name" value={account.display_name} />
+        <ReadOnlyField
+          label="Account type"
+          value={ROLE_LABEL[account.role] ?? account.role}
+        />
       </div>
-      <p className="text-xs text-ink-faint mt-4">
-        Your User ID, display name, and account type are managed by an
-        administrator and cannot be changed here.
+      <p className="text-xs text-ink-faint mt-4 flex items-start gap-1.5">
+        <IconSmallLock className="h-3.5 w-3.5 shrink-0 mt-0.5 text-ink-faint" />
+        <span>
+          Your User ID, display name, and account type are managed by an
+          administrator and cannot be changed here.
+        </span>
       </p>
     </section>
+  );
+}
+
+// A read-only field is visually distinct from an editable one at a glance —
+// muted background, small lock mark — rather than only distinguishable by
+// reading the helper text below the section.
+function ReadOnlyField({ label, value, mono = false }) {
+  return (
+    <div>
+      <p className="label flex items-center gap-1">
+        {label}
+        <IconSmallLock className="h-3 w-3 text-ink-faint" />
+      </p>
+      <p
+        className={`readonly-value bg-surface-sunken rounded-md px-3 py-2 ${mono ? 'font-mono' : ''}`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -168,11 +271,15 @@ function RecoveryEmail({ account }) {
 
   return (
     <section className="card p-6">
-      <h2 className="mb-1">Recovery email</h2>
-      <p className="text-sm text-ink-muted mb-4">
-        Password reset links are sent to this address. Changing it requires
-        your password and confirmation from the new address.
-      </p>
+      <SectionHeading
+        icon={
+          <SectionIcon>
+            <IconMail className="h-4.5 w-4.5" />
+          </SectionIcon>
+        }
+        title="Recovery email"
+        description="Password reset links are sent to this address. Changing it requires your password and confirmation from the new address."
+      />
 
       <div className="max-w-md space-y-4">
         {status && (
@@ -185,9 +292,11 @@ function RecoveryEmail({ account }) {
           <div>
             <p className="label">Email address</p>
             <div className="flex items-center gap-3">
-              <p className="readonly-value flex-1">{account.email}</p>
+              <p className="readonly-value bg-surface-sunken rounded-md px-3 py-2 flex-1 truncate">
+                {account.email}
+              </p>
               {!pending && (
-                <button type="button" className="btn-secondary" onClick={startEditing}>
+                <button type="button" className="btn-secondary shrink-0" onClick={startEditing}>
                   Change email
                 </button>
               )}
@@ -198,10 +307,11 @@ function RecoveryEmail({ account }) {
         {pending && !editing && (
           <div className="rounded-lg border border-state-review/25 bg-state-reviewBg px-4 py-3 space-y-3">
             <div>
-              <p className="text-sm text-state-review font-medium">
+              <p className="text-sm text-state-review font-medium flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-state-review inline-block" />
                 Awaiting confirmation
               </p>
-              <p className="text-sm text-state-review mt-0.5">
+              <p className="text-sm text-state-review mt-1">
                 A link was sent to {pending}. Your address changes once it is
                 opened. Until then, reset emails go to {account.email}.
               </p>
@@ -342,12 +452,19 @@ function ChangePassword({ account }) {
 
   return (
     <section className="card p-6">
-      <h2 className="mb-1">Password</h2>
-      <p className="text-sm text-ink-muted mb-4">
-        {open
-          ? 'Your current password is required to confirm this change.'
-          : 'Change the password you use to sign in.'}
-      </p>
+      <SectionHeading
+        icon={
+          <SectionIcon tone="ink">
+            <IconLock className="h-4.5 w-4.5" />
+          </SectionIcon>
+        }
+        title="Password"
+        description={
+          open
+            ? 'Your current password is required to confirm this change.'
+            : 'Change the password you use to sign in.'
+        }
+      />
 
       <div className="max-w-md space-y-4">
         {status && (
