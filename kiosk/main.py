@@ -21,19 +21,18 @@ from kivy.config import Config
 Config.set("graphics", "orientation", "landscape")
 Config.set("kivy", "exit_on_escape", "1")
 
-# Target the kiosk's actual panel: 480x320 is the standard resolution for the
-# 3.5" touchscreens used with the Raspberry Pi (Waveshare/Elecrow/etc.). All
-# kv sizing is expressed relative to Window.width/height, so this also sets
-# the scale for every screen — change it here if the real panel differs. This
-# must be set via Config (not Window.size) *before* kivy.core.window is
-# imported: the window is created from these Config values at import time, so
-# a later Window.size assignment lands only after the kv rules have already
-# bound to the old (Config-default 800x600) size.
-Config.set("graphics", "width", "480")
-Config.set("graphics", "height", "320")
+# The kiosk originally targeted a 480x320 SPI/GPIO touchscreen panel, but that
+# panel has no working GPU-mirroring driver on this OS's modern KMS display
+# stack (the classic fbcp/fbcp-ili9341 tools need the deprecated Broadcom
+# DispmanX userland, which doesn't exist here) — so the kiosk now runs on a
+# regular HDMI display instead. "auto" fullscreen sizes the window to
+# whatever the connected display's actual resolution is; kv sizing is
+# expressed relative to Window.width/height so every screen scales with it.
+# This must be set via Config (not Window.size) *before* kivy.core.window is
+# imported: the window is created from these Config values at import time.
+Config.set("graphics", "fullscreen", "auto")
 
-# Kiosk mode: no window manager chrome (title bar would eat into a 320px-tall
-# panel) and no visible mouse pointer on a touchscreen-only device.
+# Kiosk mode: no window manager chrome and no visible mouse pointer.
 Config.set("graphics", "borderless", "1")
 Config.set("graphics", "show_cursor", "0")
 
