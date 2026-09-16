@@ -1,0 +1,55 @@
+MeatSentinel Kiosk — Switching between the 3.5" LCD and an HDMI monitor
+========================================================================
+
+Why this exists
+----------------
+The kiosk's 3.5" screen is a GPIO/SPI panel (dtoverlay=tft35a), not a real
+HDMI display. To make anything render on it at all, /boot/firmware/config.txt
+forces the Pi's GPU to output a fake 480x320 "virtual HDMI" signal
+(hdmi_force_hotplug=1, hdmi_group/hdmi_mode/hdmi_cvt/hdmi_drive), which a
+mirroring daemon (fbcp-ili9341) then copies onto the real SPI panel.
+
+That means: as long as those forcing lines are active, a REAL HDMI monitor
+plugged in at the same time will only ever show a tiny 480x320 image — not
+its native resolution. To use a normal-size HDMI monitor (e.g. for regular
+dev work on the Pi), those lines need to be removed, and the mirror daemon
+turned off, until you switch back.
+
+Two saved config files make this a one-command swap instead of manual
+editing every time:
+
+  /home/pi4_01/display-configs/config.txt.lcd-mode   <- current kiosk setup
+  /home/pi4_01/display-configs/config.txt.hdmi-mode  <- same file, minus the
+                                                          six LCD-forcing lines
+
+Switching TO a full-resolution HDMI monitor
+--------------------------------------------
+1. sudo systemctl stop fbcp-ili9341.service   (or whatever the mirror
+   service ends up named once it's installed — this stops it from trying
+   to copy a full-res framebuffer onto a 480x320 SPI panel)
+2. sudo systemctl disable fbcp-ili9341.service
+3. sudo cp /home/pi4_01/display-configs/config.txt.hdmi-mode /boot/firmware/config.txt
+4. sudo reboot
+5. Plug in the HDMI monitor before or during boot. It should now come up at
+   its native resolution, normal desktop, normal taskbar (nothing here
+   touches the taskbar/autologin settings — only the display mode).
+
+Switching BACK to the LCD kiosk
+---------------------------------
+1. sudo cp /home/pi4_01/display-configs/config.txt.lcd-mode /boot/firmware/config.txt
+2. sudo systemctl enable fbcp-ili9341.service
+3. sudo systemctl start fbcp-ili9341.service
+4. sudo reboot
+5. The 3.5" LCD should show the mirrored kiosk app again.
+
+Notes
+-----
+- Always reboot after swapping config.txt — display mode is set at boot,
+  not live-switchable.
+- The kiosk app itself (main.py) always renders at a fixed 480x320 window
+  regardless of which config is active — in HDMI mode you'll just see that
+  small window on your monitor unless you temporarily edit
+  Config.set("graphics", "width"/"height") in main.py, which isn't
+  necessary just to do general dev/admin work on the Pi.
+- If you rename or reinstall the mirror service under a different name than
+  "fbcp-ili9341.service", update the systemctl lines above to match.
