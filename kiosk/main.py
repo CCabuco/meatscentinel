@@ -32,6 +32,11 @@ Config.set("kivy", "exit_on_escape", "1")
 Config.set("graphics", "width", "480")
 Config.set("graphics", "height", "320")
 
+# Kiosk mode: no window manager chrome (title bar would eat into a 320px-tall
+# panel) and no visible mouse pointer on a touchscreen-only device.
+Config.set("graphics", "borderless", "1")
+Config.set("graphics", "show_cursor", "0")
+
 from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.resources import resource_add_path
