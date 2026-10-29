@@ -1,5 +1,7 @@
 # Core UI
-kivy==2.3.0
+# 2.3.1, not 2.3.0: 2.3.0 doesn't build under Python 3.13 (its Cython-generated
+# _event.c uses C API removed in 3.13); 2.3.1 added 3.13 support.
+kivy==2.3.1
 
 # Cloud backend
 supabase==2.31.0
@@ -20,9 +22,6 @@ python-dotenv==1.0.1
 # result already gives the kiosk a reliable, synchronous success/failure
 # signal, which is what actually drives the upload UI.
 
-# Hardware (Raspberry Pi only — install these ON the Pi, not on a dev laptop).
-# The app auto-falls-back to a mock hardware layer if these are missing,
-# so development/testing works fine on a normal PC without them.
-gpiozero==2.0.1
-RPi.GPIO==0.7.1; platform_machine=='armv7l' or platform_machine=='aarch64'
-spidev==3.6; platform_machine=='armv7l' or platform_machine=='aarch64'
+# Hardware: sensors and fan live on the ESP32, reached over HTTP
+# (hardware/esp32.py). No GPIO/SPI libraries are needed on the Pi any more.
+requests==2.34.2

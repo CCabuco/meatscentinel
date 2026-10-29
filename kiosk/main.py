@@ -2,9 +2,12 @@
 MeatSentinel Kiosk — MVP
 Raspberry Pi 4 + 3.5" touchscreen, Kivy UI, Supabase backend.
 
-Run directly with `python main.py`. Falls back to a mock hardware layer
-automatically when GPIO/SPI/RPi libraries aren't present, so this also runs
-fine on a regular dev laptop for building/testing the UI and logic.
+Sensors (HX711 presence, MQ-136/MQ-137 gas) and the exhaust fan live on an
+ESP32 that the kiosk talks to over HTTP (hardware/esp32.py).
+
+Run directly with `python main.py`. On a dev laptop that can't reach the
+ESP32, falls back to a mock hardware layer automatically, so this also runs
+fine for building/testing the UI and logic.
 """
 import json
 import logging
@@ -42,9 +45,7 @@ from kivy.resources import resource_add_path
 from kivy.uix.screenmanager import ScreenManager, NoTransition
 
 from logging_config import setup_logging
-from hardware.ultrasonic import build_ultrasonic_sensor
-from hardware.gas_sensors import build_gas_sensor_array
-from hardware.fan import build_fan
+from hardware.esp32 import build_esp32_controller
 from services.db import KioskStateStore, OfflineQueueStore, load_device_id
 from services.supabase_client import RealtimeConfirmer, OfflineRetryDaemon
 
@@ -105,9 +106,7 @@ class MeatSentinelApp(App):
 
         # Hardware layer (S.3 — graceful fallback if a sensor isn't detected)
         hardware_mode = self.config.get("hardware_mode", "auto")
-        self.ultrasonic_sensor = build_ultrasonic_sensor(self.config["pins"], hardware_mode)
-        self.gas_sensors = build_gas_sensor_array(self.config["adc"], hardware_mode)
-        self.fan = build_fan(self.config["pins"], hardware_mode)
+        self.esp32 = build_esp32_controller(self.config["esp32"], hardware_mode)
 
         # Local storage (Module 1.4 persistence, Module 5.3 offline queue)
         self.state_store = KioskStateStore(os.path.join(BASE_DIR, "kiosk_state.db"))
@@ -171,11 +170,10 @@ class MeatSentinelApp(App):
     def on_stop(self):
         self.offline_retry_daemon.stop()
         self.realtime_confirmer.stop()
-        for device in (self.ultrasonic_sensor, self.gas_sensors, self.fan):
-            try:
-                device.close()
-            except Exception:
-                pass
+        try:
+            self.esp32.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

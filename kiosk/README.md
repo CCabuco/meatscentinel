@@ -11,17 +11,16 @@ Built against `MeatSentinel_Kiosk_MVP.md` (Modules 1–6 + system-level features
 
 ```
 main.py                 App entry point, wiring, global exception handler
-config.json              Timings, GPIO pins, ADC channels, min readings
+config.json              Timings, ESP32 URL + ADC-to-ppm scaling, min readings
 thresholds.json           NH3 / H2S thresholds per meat type
 device.json                Fallback device id (real id read from /etc/machine-id)
 .env.example                Supabase credentials template — copy to .env
 
-hardware/                Sensor adapters — real GPIO/SPI with automatic
-                          fallback to a mock layer when hardware isn't present
+hardware/                Sensor/fan adapter — HTTP client for the ESP32, with
+                          automatic fallback to a mock layer off-Pi
+  esp32.py                  HX711 presence, MQ-137 (NH3) / MQ-136 (H2S),
+                            exhaust fan relay (Modules 2, 3, 6)
   mock.py
-  ultrasonic.py            HC-SR04 presence sensor (Module 2)
-  gas_sensors.py           MQ-135 / MQ-136 via MCP3008 ADC (Module 3)
-  fan.py                    Exhaust fan relay (Module 6)
 
 services/                 Non-UI logic
   db.py                     SQLite: last-selection state + offline queue
@@ -72,10 +71,14 @@ the web app's responsibility — the kiosk never touches them.
 
 ## Running on a dev laptop (no Raspberry Pi needed)
 
-The hardware layer auto-detects whether GPIO/SPI libraries and real
-peripherals are available. If not, it transparently uses the mock
-sensors in `hardware/mock.py`, so the full UI and flow can be built and
-tested on a normal computer.
+All chamber hardware lives on an ESP32 (`SYS07_ESP32_Dashboard.ino`)
+that the kiosk drives over HTTP. On a non-Pi machine with
+`hardware_mode: "auto"`, the kiosk probes `esp32.base_url` once at
+startup and, if the ESP32 isn't reachable, transparently uses the mock
+in `hardware/mock.py` (which enforces the same start → end → fan order
+as the firmware), so the full UI and flow can be built and tested on a
+normal computer. On the Pi, `auto` always uses the real ESP32 and shows
+"unavailable" states until it answers, rather than faking readings.
 
 ```bash
 python -m venv venv
@@ -85,15 +88,17 @@ cp .env.example .env      # fill in your Supabase project URL + service key
 python main.py
 ```
 
-On the placement screen, use the **"Simulate Sample Placement (dev/mock
-mode)"** button to trigger presence detection without real hardware.
+On the placement screen, Start Detection unlocks only once the ESP32's
+HX711 weight sensor reports an object present. In mock mode a simulated
+sample "lands" about 3 seconds after the screen opens.
 
 ## Deploying to the Raspberry Pi kiosk
 
-1. Wire up the HC-SR04, MQ-135/MQ-136 (via MCP3008), and fan relay per
-   the pin assignments in `config.json`.
-2. `pip install -r requirements.txt` inside a venv on the Pi (this pulls
-   in `gpiozero`, `RPi.GPIO`, `spidev` for the `armv7l`/`aarch64` targets).
+1. Flash the ESP32 with `SYS07_ESP32_Dashboard.ino` (sensors and fan
+   relay are wired to the ESP32, not the Pi). Put the Pi on a network
+   where it can reach the ESP32 **and** the internet, and set
+   `esp32.base_url` in `config.json` to the ESP32's address on it.
+2. `pip install -r requirements.txt` inside a venv on the Pi.
 3. Calibrate the touchscreen (`xinput_calibrator`) — see System feature S.2.
 4. Set `hardware_mode` in `config.json` to `"real"` once you want the app
    to fail loudly instead of silently falling back to mock sensors.
@@ -107,8 +112,9 @@ mode)"** button to trigger presence detection without real hardware.
 
 ## Notes / known simplifications for the MVP
 
-- The NH3/H2S ADC-voltage-to-ppm conversion in `hardware/gas_sensors.py`
-  is a placeholder linear mapping — swap in the real calibration curve
+- The ESP32 reports raw 12-bit ADC counts, not ppm. The conversion in
+  `hardware/esp32.py` (`esp32.*_ppm_scale` / `*_ppm_offset` in
+  `config.json`) is a placeholder linear mapping — swap in the real calibration curve
   from bench testing against known reference gas concentrations before
   relying on absolute ppm values.
 - Realtime confirmation (Module 5.6) is a permanent no-op by design:
