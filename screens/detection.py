@@ -1,4 +1,5 @@
 """Module 3 — Detection Status (timed gas sampling cycle)."""
+import logging
 import statistics
 import threading
 import time
@@ -6,6 +7,8 @@ import time
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.uix.screenmanager import Screen
+
+log = logging.getLogger("meatsentinel.screens.detection")
 
 
 class DetectionScreen(Screen):
@@ -23,6 +26,7 @@ class DetectionScreen(Screen):
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._start_time = None
+        self._measuring = False
 
         self.ids.status_label.text = "Warming up sensors…"
         self.ids.ring.progress = 0.0
@@ -36,30 +40,74 @@ class DetectionScreen(Screen):
         self._stop_event.set()
         if hasattr(self, "_ui_event"):
             self._ui_event.cancel()
+        if self._measuring:
+            # Left mid-cycle: don't leave the ESP32 stuck in MEASURING.
+            self._measuring = False
+            threading.Thread(target=App.get_running_app().esp32.end_measurement,
+                             daemon=True).start()
 
     def _run_cycle(self):
-        app = App.get_running_app()
-        sensors = app.gas_sensors
+        esp32 = App.get_running_app().esp32
 
-        sensors.warmup(self.warmup_s)
+        # Firmware order: object present → /start → /end → /fan/on.
+        ok, message = esp32.start_measurement()
+        if not ok:
+            self._abort(f"Couldn't start measurement: {message}")
+            return
+        self._measuring = True
+
+        self._stop_event.wait(self.warmup_s)
         if self._stop_event.is_set():
             return
 
         self._start_time = time.monotonic()
+        last_seen = self._start_time
         Clock.schedule_once(lambda _dt: setattr(self.ids.status_label, "text", "Detecting…"))
 
         while not self._stop_event.is_set():
             elapsed = time.monotonic() - self._start_time
             if elapsed >= self.duration_s:
                 break
-            nh3 = sensors.read_nh3_ppm()
-            h2s = sensors.read_h2s_ppm()
-            with self._lock:
-                self._readings.append((time.time(), nh3, h2s))
+            # Only snapshots fetched since the last one we used, so the same
+            # ESP32 reading is never counted twice. A stale/unreachable
+            # status just means no reading this tick.
+            status = esp32.status(newer_than=last_seen)
+            if status is not None:
+                last_seen = status["fetched_at"]
+                if not status["measuring"]:
+                    # The firmware cancels a measurement on its own when the
+                    # object is removed or the HX711 drops out.
+                    self._measuring = False
+                    self._abort("Measurement cancelled — sample removed or scale lost.")
+                    return
+                with self._lock:
+                    self._readings.append((time.time(), esp32.nh3_ppm(status), esp32.h2s_ppm(status)))
             self._stop_event.wait(self.poll_interval_s)
 
-        if not self._stop_event.is_set():
-            Clock.schedule_once(lambda _dt: self._finish())
+        if self._stop_event.is_set():
+            return
+
+        ok, message = esp32.end_measurement()
+        self._measuring = False
+        if not ok:
+            # Readings are still good; ventilation will report the fan being refused.
+            log.warning("End Measurement failed: %s", message)
+        Clock.schedule_once(lambda _dt: self._finish())
+
+    def _abort(self, message):
+        log.warning("Detection aborted: %s", message)
+
+        def show(_dt):
+            if self._stop_event.is_set():
+                return
+            self.ids.status_label.text = message
+            Clock.schedule_once(back_to_placement, 3)
+
+        def back_to_placement(_dt):
+            if self.manager.current == self.name:
+                self.manager.current = "placement"
+
+        Clock.schedule_once(show)
 
     def _update_ui(self, _dt):
         if self._start_time is None:

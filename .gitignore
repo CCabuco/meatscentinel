@@ -6,3 +6,5 @@ __pycache__/
 venv/
 .venv/
 .claude/
+SYS07_ESP32_Dashboard.ino
+meatscentinel/
