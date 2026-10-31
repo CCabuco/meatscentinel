@@ -40,6 +40,11 @@ class VentilationScreen(Screen):
         esp32 = App.get_running_app().esp32
 
         def worker():
+            # If detection's /end was lost to a network drop, the ESP32 is
+            # still MEASURING and would refuse the fan with a 409 — end it here.
+            status = esp32.status()
+            if status is None or status["measuring"]:
+                esp32.end_measurement()
             ok, message = esp32.fan_on()
             Clock.schedule_once(lambda _dt: self._on_fan_on(ok, message))
 
