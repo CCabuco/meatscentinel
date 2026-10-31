@@ -1,4 +1,5 @@
 """Module 6 — Chamber Ventilation."""
+import threading
 import time
 
 from kivy.app import App
@@ -18,6 +19,7 @@ class VentilationScreen(Screen):
         self.ids.percent_label.text = "0%"
         self.ids.status_label.text = "Ready to ventilate"
         self.ids.start_stop_btn.text = "Start Ventilation"
+        self.ids.start_stop_btn.disabled = False
         self.ids.new_inspection_btn.disabled = True
 
     def on_leave(self, *args):
@@ -32,8 +34,31 @@ class VentilationScreen(Screen):
             self._start()
 
     def _start(self):
-        app = App.get_running_app()
-        app.fan.on()
+        # Fan commands are HTTP calls to the ESP32 — keep them off the UI thread.
+        self.ids.start_stop_btn.disabled = True
+        self.ids.status_label.text = "Starting fan…"
+        esp32 = App.get_running_app().esp32
+
+        def worker():
+            # If detection's /end was lost to a network drop, the ESP32 is
+            # still MEASURING and would refuse the fan with a 409 — end it here.
+            status = esp32.status()
+            if status is None or status["measuring"]:
+                esp32.end_measurement()
+            ok, message = esp32.fan_on()
+            Clock.schedule_once(lambda _dt: self._on_fan_on(ok, message))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_fan_on(self, ok, message):
+        self.ids.start_stop_btn.disabled = False
+        if self.manager.current != self.name:
+            return
+        if not ok:
+            # e.g. 409 "End a measurement before turning on the fan."
+            self.ids.status_label.text = f"Fan refused: {message}"
+            self.ids.new_inspection_btn.disabled = False
+            return
         self._running = True
         self._start_time = time.monotonic()
         self.ids.start_stop_btn.text = "Stop Ventilation"
@@ -45,6 +70,17 @@ class VentilationScreen(Screen):
         progress = min(1.0, elapsed / self.duration_s) if self.duration_s > 0 else 1.0
         self.ids.ring.progress = progress
         self.ids.percent_label.text = f"{int(progress * 100)}%"
+
+        status = App.get_running_app().esp32.status(newer_than=self._start_time)
+        if status is None:
+            self.ids.status_label.text = "Ventilating… (ESP32 not responding)"
+        elif not status["fan_on"]:
+            # Firmware stops the fan itself after 30 s (or it was switched off).
+            self._complete()
+            return
+        else:
+            self.ids.status_label.text = "Ventilating…"
+
         if progress >= 1.0:
             self._complete()
 
@@ -60,13 +96,15 @@ class VentilationScreen(Screen):
         self._stop_fan()
         if self._event:
             self._event.cancel()
+        self.ids.ring.progress = 1.0
+        self.ids.percent_label.text = "100%"
         self.ids.status_label.text = "Ventilation complete — ready for next inspection."
         self.ids.start_stop_btn.text = "Start Ventilation"
         self.ids.new_inspection_btn.disabled = False
 
     def _stop_fan(self):
         app = App.get_running_app()
-        app.fan.off()
+        threading.Thread(target=app.esp32.fan_off, daemon=True).start()
         self._running = False
 
     def new_inspection(self):

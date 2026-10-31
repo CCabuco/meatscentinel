@@ -2,9 +2,11 @@
 MeatSentinel Kiosk — MVP
 Raspberry Pi 4 + 3.5" touchscreen, Kivy UI, Supabase backend.
 
-Run directly with `python main.py`. Falls back to a mock hardware layer
-automatically when GPIO/SPI/RPi libraries aren't present, so this also runs
-fine on a regular dev laptop for building/testing the UI and logic.
+Sensors (HX711 presence, MQ-136/MQ-137 gas) and the exhaust fan live on an
+ESP32 that the kiosk talks to over HTTP (hardware/esp32.py).
+
+Run directly with `python main.py`. The machine running it must be able to
+reach the ESP32 at esp32.base_url in config.json.
 """
 import json
 import logging
@@ -21,16 +23,19 @@ from kivy.config import Config
 Config.set("graphics", "orientation", "landscape")
 Config.set("kivy", "exit_on_escape", "1")
 
-# Target the kiosk's actual panel: 480x320 is the standard resolution for the
-# 3.5" touchscreens used with the Raspberry Pi (Waveshare/Elecrow/etc.). All
-# kv sizing is expressed relative to Window.width/height, so this also sets
-# the scale for every screen — change it here if the real panel differs. This
-# must be set via Config (not Window.size) *before* kivy.core.window is
-# imported: the window is created from these Config values at import time, so
-# a later Window.size assignment lands only after the kv rules have already
-# bound to the old (Config-default 800x600) size.
-Config.set("graphics", "width", "480")
-Config.set("graphics", "height", "320")
+# The kiosk originally targeted a 480x320 SPI/GPIO touchscreen panel, but that
+# panel has no working GPU-mirroring driver on this OS's modern KMS display
+# stack (the classic fbcp/fbcp-ili9341 tools need the deprecated Broadcom
+# DispmanX userland, which doesn't exist here) — so the kiosk now runs on a
+# regular HDMI display instead. "auto" fullscreen sizes the window to
+# whatever the connected display's actual resolution is; kv sizing is
+# expressed relative to Window.width/height so every screen scales with it.
+# This must be set via Config (not Window.size) *before* kivy.core.window is
+# imported: the window is created from these Config values at import time.
+Config.set("graphics", "fullscreen", "auto")
+
+# Kiosk mode: no window manager chrome.
+Config.set("graphics", "borderless", "1")
 
 from kivy.core.window import Window
 from kivy.lang import Builder
@@ -38,11 +43,9 @@ from kivy.resources import resource_add_path
 from kivy.uix.screenmanager import ScreenManager, NoTransition
 
 from logging_config import setup_logging
-from hardware.ultrasonic import build_ultrasonic_sensor
-from hardware.gas_sensors import build_gas_sensor_array
-from hardware.fan import build_fan
+from hardware.esp32 import build_esp32_controller
 from services.db import KioskStateStore, OfflineQueueStore, load_device_id
-from services.supabase_client import RealtimeConfirmer, OfflineRetryDaemon
+from services.supabase_client import OfflineRetryDaemon
 
 # Screens (imported so Kivy's factory can resolve <ClassName> rules in .kv)
 from screens.progress_ring import ProgressRing  # noqa: F401  (used by kv)
@@ -99,23 +102,16 @@ class MeatSentinelApp(App):
         # Global exception handler (S.6)
         ExceptionManager.add_handler(KioskExceptionHandler(self))
 
-        # Hardware layer (S.3 — graceful fallback if a sensor isn't detected)
-        hardware_mode = self.config.get("hardware_mode", "auto")
-        self.ultrasonic_sensor = build_ultrasonic_sensor(self.config["pins"], hardware_mode)
-        self.gas_sensors = build_gas_sensor_array(self.config["adc"], hardware_mode)
-        self.fan = build_fan(self.config["pins"], hardware_mode)
+        # Hardware layer (S.3 — reads as "unavailable" until the ESP32 answers)
+        self.esp32 = build_esp32_controller(self.config["esp32"])
 
         # Local storage (Module 1.4 persistence, Module 5.3 offline queue)
         self.state_store = KioskStateStore(os.path.join(BASE_DIR, "kiosk_state.db"))
         self.offline_queue = OfflineQueueStore(os.path.join(BASE_DIR, "offline_queue.db"))
 
-        # Realtime confirmation (Module 5.6) — best effort, never blocks the UI.
-        self.realtime_confirmer = RealtimeConfirmer(on_confirmed=self._on_realtime_confirmed)
-        self.realtime_confirmer.start()
-
         # Offline retry daemon (Module 5.4)
         self.offline_retry_daemon = OfflineRetryDaemon(
-            self.offline_queue, self.config["offline_retry_interval_s"], self.config
+            self.offline_queue, self.config["offline_retry_interval_s"], self.config, self.device_id
         )
         self.offline_retry_daemon.start()
 
@@ -155,10 +151,6 @@ class MeatSentinelApp(App):
         self.detection_result = None
         self.current_record = None
 
-    def _on_realtime_confirmed(self, row):
-        if row.get("inspection_id") == self.inspection_id:
-            self.log.info("Realtime confirmation received for inspection_id=%s", self.inspection_id)
-
     def show_fatal_error(self, message: str):
         error_screen = self.screen_manager.get_screen("error")
         error_screen.show_error(message)
@@ -166,12 +158,10 @@ class MeatSentinelApp(App):
 
     def on_stop(self):
         self.offline_retry_daemon.stop()
-        self.realtime_confirmer.stop()
-        for device in (self.ultrasonic_sensor, self.gas_sensors, self.fan):
-            try:
-                device.close()
-            except Exception:
-                pass
+        try:
+            self.esp32.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

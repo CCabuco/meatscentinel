@@ -1,4 +1,5 @@
 """Module 4 — Gas-Based Result & Invalid Reading Display."""
+import statistics
 import time
 from datetime import datetime, timezone
 
@@ -51,6 +52,13 @@ class ResultScreen(Screen):
             detection.get("finished_at", time.time()), tz=timezone.utc
         ).isoformat()
 
+        readings = detection.get("readings") or []
+        nh3_values = [r["nh3"] for r in readings]
+        h2s_values = [r["h2s"] for r in readings]
+
+        def _stddev(values):
+            return round(statistics.pstdev(values), 3) if len(values) >= 2 else None
+
         # 4.6 — build the record for Module 5, shaped for the shared
         # Supabase schema (inspection_records + gas_submissions).
         app.current_record = {
@@ -61,6 +69,10 @@ class ResultScreen(Screen):
             "gas_result": gas_result,
             "is_valid": is_valid,
             "detected_at": detected_at,
+            "device_id": app.device_id,
+            "reading_count": len(readings),
+            "nh3_stddev": _stddev(nh3_values),
+            "h2s_stddev": _stddev(h2s_values),
         }
 
     def continue_to_upload(self):

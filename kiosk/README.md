@@ -11,22 +11,19 @@ Built against `MeatSentinel_Kiosk_MVP.md` (Modules 1–6 + system-level features
 
 ```
 main.py                 App entry point, wiring, global exception handler
-config.json              Timings, GPIO pins, ADC channels, min readings
+config.json              Timings, ESP32 URL + ADC-to-ppm scaling, min readings
 thresholds.json           NH3 / H2S thresholds per meat type
 device.json                Fallback device id (real id read from /etc/machine-id)
-.env.example                Supabase credentials template — copy to .env
+.env.example                Upload settings template (URL + device secret) — copy to .env
 
-hardware/                Sensor adapters — real GPIO/SPI with automatic
-                          fallback to a mock layer when hardware isn't present
-  mock.py
-  ultrasonic.py            HC-SR04 presence sensor (Module 2)
-  gas_sensors.py           MQ-135 / MQ-136 via MCP3008 ADC (Module 3)
-  fan.py                    Exhaust fan relay (Module 6)
+hardware/                Sensor/fan adapter — HTTP client for the ESP32
+  esp32.py                  HX711 presence, MQ-137 (NH3) / MQ-136 (H2S),
+                            exhaust fan relay (Modules 2, 3, 6)
 
 services/                 Non-UI logic
-  db.py                     SQLite: last-selection state + offline queue
+  db.py                     SQLite: last-selection state, offline queue, rejected records
   network.py                Connectivity check
-  supabase_client.py         Insert, Realtime confirmation, offline retry daemon
+  supabase_client.py         Upload via submit-inspection Edge Function, offline retry daemon
 
 screens/                  One file per kiosk screen/module
 kv/                        Kivy layout files, one per screen + shared styles
@@ -37,99 +34,86 @@ deploy/
   schema.sql                  Reference doc for the shared schema (not a script to run — see below)
 ```
 
-## Shared Supabase schema
+## Uploading to Supabase (shared with the web dashboard)
 
-The kiosk shares one Supabase project with the MeatSentinel web dashboard.
-The schema (tables, enums, RLS, triggers) is owned and migrated from the
-**web app's** repo, not this one — `deploy/schema.sql` here is read-only
-reference documentation, not something you run.
+The kiosk does **not** connect to the database directly and does **not**
+hold the Supabase service key. Each gas result is POSTed to the
+`submit-inspection` Edge Function with a `DEVICE_SECRET` in the
+`x-device-secret` header. The function validates the payload and writes
+it through `submit_device_inspection()` (migration
+`016_device_submission.sql`), which only `service_role` may execute. So
+even if a kiosk is stolen, its secret can only add gas submissions; it
+cannot read inspections, accounts or anything else. Rotate the secret on
+the server to cut a lost kiosk off.
 
-The kiosk only ever writes to two tables, both via `services/supabase_client.py`:
+What the server does with one upload:
 
-1. `inspection_records` — upserted first (`inspection_id` only). A
-   database trigger on this table automatically creates the case's first
-   `status_entries` row (`status='Open'`). **Never** insert into
-   `status_entries` from kiosk code — it's append-only (deletes/updates
-   are blocked by a trigger), so a duplicate row can't be undone.
-2. `gas_submissions` — inserted second (it foreign-keys to
-   `inspection_records.inspection_id`, so the parent must exist first),
-   carrying `sample_type`, `nh3_ppm`, `h2s_ppm`, `gas_result`
-   (`'Fresh'`/`'Spoiled'`, only when `is_valid`), `is_valid`, and
-   `detected_at`. This table rejects writes to a row that already exists
-   ("immutable once received"), so it's a plain insert guarded by an
-   existence check — not an upsert like `inspection_records`.
+1. Inserts the `gas_submissions` row. Its `gas_ensure_parent` trigger
+   creates the `inspection_records` row, which creates the first `Open`
+   status entry. The kiosk never touches `status_entries`.
+2. Records `submission_id` in a private `device_submissions` ledger.
+3. Fusion runs automatically once the image half also exists.
 
-Each inspection cycle gets a fresh `inspection_id` (`uuid4`, generated in
-`MeatSentinelApp.reset_inspection_state()`), matching the
-`inspection_id_format` check constraint. Because `inspection_records` is
-upserted and `gas_submissions` checks-before-inserting, a failed upload
-can always be retried from the offline queue without risking a
-duplicate-key error or an immutability rejection.
+Responses and what the kiosk does:
 
-`final_classification` on `inspection_records` (the combined gas+vision
-verdict) and everything in `image_submissions`/`accounts`/`remarks` is
-the web app's responsibility — the kiosk never touches them.
+| Server answer | Meaning | Kiosk action |
+|---|---|---|
+| 201 created / 200 duplicate | Stored (duplicate = an earlier attempt already got through) | Success |
+| 409 conflict | Inspection already has a gas result | Moved to the `rejected` table, not retried |
+| 400 / 422 | Bad payload | Moved to the `rejected` table, not retried |
+| 401 | `DEVICE_SECRET` wrong | Stays queued until fixed |
+| network error / 5xx | Temporary | Stays queued, retried every 30 s |
 
-## Running on a dev laptop (no Raspberry Pi needed)
+`submission_id` is a uuid5 of `inspection_id`, so every retry of the same
+inspection sends the same id. Rejected records stay in `offline_queue.db`
+(table `rejected`) and in `inspection.log`; nothing is silently dropped.
 
-The hardware layer auto-detects whether GPIO/SPI libraries and real
-peripherals are available. If not, it transparently uses the mock
-sensors in `hardware/mock.py`, so the full UI and flow can be built and
-tested on a normal computer.
+Each upload also carries `device_id`, `reading_count`, and the NH3/H2S
+standard deviations. The server flags `clock_reliable = false` if
+`detected_at` is in the future or older than 30 days (a Pi with no
+internet has no time sync).
+
+## Running on a laptop
+
+All chamber hardware lives on an ESP32 (`SYS07_ESP32_Dashboard.ino`)
+that the kiosk drives over HTTP, so the kiosk runs on any machine that
+can reach `esp32.base_url`. There is no simulated hardware: until the
+ESP32 answers, the screens show "unavailable" states rather than faking
+readings.
 
 ```bash
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env      # fill in your Supabase project URL + service key
+cp .env.example .env      # fill in SUPABASE_URL + DEVICE_SECRET
 python main.py
 ```
 
-On the placement screen, use the **"Simulate Sample Placement (dev/mock
-mode)"** button to trigger presence detection without real hardware.
+On the placement screen, Start Detection unlocks only once the ESP32's
+HX711 weight sensor reports an object present.
 
 ## Deploying to the Raspberry Pi kiosk
 
-1. Wire up the HC-SR04, MQ-135/MQ-136 (via MCP3008), and fan relay per
-   the pin assignments in `config.json`.
-2. `pip install -r requirements.txt` inside a venv on the Pi (this pulls
-   in `gpiozero`, `RPi.GPIO`, `spidev` for the `armv7l`/`aarch64` targets).
+1. Flash the ESP32 with `SYS07_ESP32_Dashboard.ino` (sensors and fan
+   relay are wired to the ESP32, not the Pi). Put the Pi on a network
+   where it can reach the ESP32 **and** the internet, and set
+   `esp32.base_url` in `config.json` to the ESP32's address on it.
+2. `pip install -r requirements.txt` inside a venv on the Pi.
 3. Calibrate the touchscreen (`xinput_calibrator`) — see System feature S.2.
-4. Set `hardware_mode` in `config.json` to `"real"` once you want the app
-   to fail loudly instead of silently falling back to mock sensors.
-5. Run `deploy/install_service.sh` to install and enable the systemd
+4. Run `deploy/install_service.sh` to install and enable the systemd
    service so the kiosk launches on boot with no desktop shown.
-6. Fill in `.env` with the shared Supabase project's URL and service-role
-   key (ask the web app team) — see "Shared Supabase schema" above for
-   what the kiosk expects to already exist. Optionally enable Realtime on
-   `gas_submissions` (Database > Replication in the dashboard) so the
-   kiosk's best-effort upload confirmation works.
+5. Fill in `.env` with `SUPABASE_URL` and the `DEVICE_SECRET` (ask the
+   web app team; it must match the Edge Function secret). Never put the
+   service key on the kiosk.
 
 ## Notes / known simplifications for the MVP
 
-- The NH3/H2S ADC-voltage-to-ppm conversion in `hardware/gas_sensors.py`
-  is a placeholder linear mapping — swap in the real calibration curve
+- The ESP32 reports raw 12-bit ADC counts, not ppm. The conversion in
+  `hardware/esp32.py` (`esp32.*_ppm_scale` / `*_ppm_offset` in
+  `config.json`) is a placeholder linear mapping — swap in the real calibration curve
   from bench testing against known reference gas concentrations before
   relying on absolute ppm values.
-- Realtime confirmation (Module 5.6) is a permanent no-op by design:
-  supabase-py's *synchronous* client (what this kiosk uses everywhere,
-  since the whole app is thread/callback-based, not asyncio) explicitly
-  does not support Realtime — only `create_async_client` does. Making it
-  work would mean running a dedicated asyncio event loop in a background
-  thread just for this. Decided against it: the REST insert result
-  already gives the kiosk a reliable, synchronous success/failure signal
-  (that's what actually drives "Upload Successful"/"Upload Failed" in the
-  UI), so Realtime would only ever be a cosmetic extra confirmation.
-  `RealtimeConfirmer.start()` still tries `.channel()` and logs a clear
-  one-line warning when it's refused, rather than blocking the UI.
+- Realtime confirmation (Module 5.6) was removed. The Edge Function's
+  HTTP response is the confirmation: 201/200 means the row is stored.
 - Combined (gas + vision) classification is explicitly out of scope for
   the kiosk per the MVP spec — that lives in the web app.
-- `requirements.txt` pins `httpx==0.27.2` and `websockets>=13,<16`
-  alongside `supabase==2.31.0`. Both matter: `supabase` itself declares a
-  correct `httpx` range now (unlike the `2.4.0` this project started on,
-  which had stale metadata that crashed every client build — see git
-  history if curious), but `realtime`'s declared `websockets` range
-  (`>=11,<16`) is looser than what it actually needs at runtime
-  (`websockets.asyncio`, added in 13) — an unpinned install can still
-  resolve `websockets` 12.x and crash with `No module named
-  'websockets.asyncio'`.

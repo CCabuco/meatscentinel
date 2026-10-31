@@ -5,10 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/meatsentinel_kiosk
+User=pi4_01
+WorkingDirectory=/home/pi4_01/meatscentinel/kiosk
 Environment=DISPLAY=:0
-ExecStart=/home/pi/meatsentinel_kiosk/venv/bin/python main.py
+Environment=XAUTHORITY=/home/pi4_01/.Xauthority
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/pi4_01/meatscentinel/venv/bin/python main.py
 Restart=on-failure
 RestartSec=3
 

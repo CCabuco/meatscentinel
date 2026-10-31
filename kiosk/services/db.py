@@ -3,6 +3,8 @@ Local SQLite storage for two things:
 
 1. Persistent "last selected meat type" (Module 1.4) — kiosk_state.db
 2. Offline upload queue for failed Supabase inserts (Module 5.3) — offline_queue.db
+   plus a `rejected` table for records the server will never accept, so
+   they are kept for review instead of being retried forever or lost.
 
 Kept as two small, single-purpose files rather than one shared DB so a
 corrupt queue file can never take down the simple state lookup.
@@ -72,6 +74,16 @@ class OfflineQueueStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rejected (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    record_json TEXT NOT NULL,
+                    reason TEXT,
+                    rejected_at REAL NOT NULL
+                )
+                """
+            )
 
     def enqueue(self, record: dict):
         with _lock, self._conn() as conn:
@@ -91,6 +103,25 @@ class OfflineQueueStore:
 
     def remove(self, row_id: int):
         with _lock, self._conn() as conn:
+            conn.execute("DELETE FROM queue WHERE id = ?", (row_id,))
+
+    def add_rejected(self, record: dict, reason: str):
+        with _lock, self._conn() as conn:
+            conn.execute(
+                "INSERT INTO rejected (record_json, reason, rejected_at) VALUES (?, ?, ?)",
+                (json.dumps(record), str(reason)[:500], time.time()),
+            )
+
+    def move_to_rejected(self, row_id: int, reason: str):
+        """Move one queued record to the rejected table in a single transaction."""
+        with _lock, self._conn() as conn:
+            row = conn.execute("SELECT record_json FROM queue WHERE id = ?", (row_id,)).fetchone()
+            if row is None:
+                return
+            conn.execute(
+                "INSERT INTO rejected (record_json, reason, rejected_at) VALUES (?, ?, ?)",
+                (row[0], str(reason)[:500], time.time()),
+            )
             conn.execute("DELETE FROM queue WHERE id = ?", (row_id,))
 
     def bump_attempts(self, row_id: int):
