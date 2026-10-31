@@ -85,6 +85,13 @@ function clientKey(req: Request): string {
 }
 
 async function sendCodeEmail(to: string, code: string) {
+  const missing = [];
+  if (!BREVO_API_KEY) missing.push('BREVO_API_KEY');
+  if (!MAIL_FROM_EMAIL) missing.push('MAIL_FROM_EMAIL');
+  if (missing.length) {
+    throw new Error(`Missing edge function secret(s): ${missing.join(', ')}`);
+  }
+
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': BREVO_API_KEY, 'content-type': 'application/json' },
@@ -106,7 +113,9 @@ async function sendCodeEmail(to: string, code: string) {
         `</div>`,
     }),
   });
-  if (!res.ok) throw new Error(`Brevo rejected the send: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`Brevo rejected the send: ${res.status} ${await res.text()}`);
+  }
 }
 
 function decodeSessionId(accessToken: string): string | null {
@@ -237,7 +246,8 @@ Deno.serve(async (req) => {
 
       try {
         await sendCodeEmail(account.email, newCode);
-      } catch {
+      } catch (err) {
+        console.error('BREVO SEND FAILED:', err instanceof Error ? err.message : String(err));
         return json({ error: 'Could not send the code. Try again shortly.' }, 502);
       }
 
@@ -366,7 +376,8 @@ Deno.serve(async (req) => {
       refresh_token: verified.session.refresh_token,
       trusted_token: trustedToken,
     });
-  } catch (_err) {
+  } catch (err) {
+    console.error('LOGIN-VERIFY FAILED:', err instanceof Error ? err.stack ?? err.message : String(err));
     return json({ error: 'Unable to complete sign-in. Try again.' }, 500);
   }
 });

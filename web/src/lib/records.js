@@ -82,6 +82,16 @@ function applyFilters(query, filters) {
   return q;
 }
 
+async function withAssignments(records) {
+  if (!records.length) return records;
+  const { data, error } = await supabase.from('customer_report_assignments')
+    .select('inspection_id,scan_id,inspector_id,inspector_name,inspector_user_id')
+    .in('inspection_id', records.map((record) => record.inspection_id));
+  if (error) throw new Error(error.message);
+  const assignments = new Map((data ?? []).map((row) => [row.inspection_id, row]));
+  return records.map((record) => ({ ...record, assignment: assignments.get(record.inspection_id) ?? null }));
+}
+
 export async function listRecords({ tab = 'all', filters = {}, page = 0 }) {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -100,7 +110,9 @@ export async function listRecords({ tab = 'all', filters = {}, page = 0 }) {
 
   if (error) return { records: [], total: 0, error: error.message };
 
-  return { records: data ?? [], total: count ?? 0, error: null };
+  try {
+    return { records: await withAssignments(data ?? []), total: count ?? 0, error: null };
+  } catch (err) { return { records: [], total: 0, error: err.message }; }
 }
 
 export async function getRecord(inspectionId) {
@@ -111,7 +123,9 @@ export async function getRecord(inspectionId) {
     .maybeSingle();
 
   if (error) return { record: null, error: error.message };
-  return { record: data, error: null };
+  try {
+    return { record: data ? (await withAssignments([data]))[0] : null, error: null };
+  } catch (err) { return { record: null, error: err.message }; }
 }
 
 // V-15 — remarks and status changes are shown in one combined

@@ -9,10 +9,13 @@ import RecordsPage from './pages/RecordsPage.jsx';
 import RecordDetailPage from './pages/RecordDetailPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import AccountsPage from './pages/AccountsPage.jsx';
+import ActivityLogPage from './pages/ActivityLogPage.jsx';
+import CustomerReportsPage from './pages/CustomerReportsPage.jsx';
+import NotificationsPage from './pages/NotificationsPage.jsx';
 import { NotFoundPage } from './pages/Placeholders.jsx';
 
-// Two roles, routed separately (V-13). Inspectors reach the inspection
-// modules; administrators reach account management and nothing else.
+// Both roles can use the inspection modules. Account management is
+// restricted to administrators.
 //
 // These guards keep people off screens that would render empty for
 // them. They are not the access boundary — that is Row Level Security
@@ -49,7 +52,7 @@ export default function App() {
       <Route
         path="/dashboard"
         element={
-          <RequireRole role="inspector">
+          <RequireRole roles={['inspector', 'administrator']}>
             <DashboardPage />
           </RequireRole>
         }
@@ -57,7 +60,7 @@ export default function App() {
       <Route
         path="/records"
         element={
-          <RequireRole role="inspector">
+          <RequireRole roles={['inspector', 'administrator']}>
             <RecordsPage />
           </RequireRole>
         }
@@ -65,7 +68,7 @@ export default function App() {
       <Route
         path="/records/:inspectionId"
         element={
-          <RequireRole role="inspector">
+          <RequireRole roles={['inspector', 'administrator']}>
             <RecordDetailPage />
           </RequireRole>
         }
@@ -74,11 +77,27 @@ export default function App() {
       <Route
         path="/accounts"
         element={
-          <RequireRole role="administrator">
+          <RequireRole roles={['administrator']}>
             <AccountsPage />
           </RequireRole>
         }
       />
+
+      <Route
+        path="/activity"
+        element={
+          <RequireRole roles={['administrator']}>
+            <ActivityLogPage />
+          </RequireRole>
+        }
+      />
+
+      <Route path="/customer-reports" element={
+        <RequireRole roles={['inspector', 'administrator']}><CustomerReportsPage /></RequireRole>
+      } />
+      <Route path="/notifications" element={
+        <RequireRole roles={['inspector', 'administrator']}><NotificationsPage /></RequireRole>
+      } />
 
       {/* Both roles have a Profile and Account page (A-02). */}
       <Route

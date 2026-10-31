@@ -1,26 +1,44 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const INSPECTOR_LINKS = [
+  { to: '/customer-reports', label: 'Customer Reports' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/records', label: 'Inspection records' },
+  { to: '/notifications', label: 'Notifications' },
   { to: '/profile', label: 'Profile' },
 ];
 
 const ADMINISTRATOR_LINKS = [
+  { to: '/customer-reports', label: 'Customer Reports' },
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/records', label: 'Inspection records' },
   { to: '/accounts', label: 'Accounts' },
+  { to: '/activity', label: 'Activity Log' },
+  { to: '/notifications', label: 'Notification management' },
   { to: '/profile', label: 'Profile' },
 ];
 
 export default function AppShell({ children }) {
   const { account, signOut } = useAuth();
   const navigate = useNavigate();
+  const [signOutError, setSignOutError] = useState(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const links = account?.role === 'administrator' ? ADMINISTRATOR_LINKS : INSPECTOR_LINKS;
 
   async function handleSignOut() {
-    await signOut();
-    navigate('/login', { replace: true });
+    setSigningOut(true);
+    setSignOutError(null);
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch {
+      setSignOutError('Could not complete sign-out. Check your connection and retry.');
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
@@ -58,8 +76,9 @@ export default function AppShell({ children }) {
             </div>
           )}
           {/* D-03 — logout lives in the global side navigation panel. */}
-          <button onClick={handleSignOut} className="btn-secondary w-full">
-            Log out
+          {signOutError && <p className="text-xs text-state-spoiled mb-2" role="alert">{signOutError}</p>}
+          <button onClick={handleSignOut} className="btn-secondary w-full" disabled={signingOut}>
+            {signingOut ? 'Signing out…' : 'Log out'}
           </button>
         </div>
       </aside>

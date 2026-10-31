@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import PasswordStrength from '../components/PasswordStrength.jsx';
 import PasswordInput from '../components/PasswordInput.jsx';
@@ -113,6 +114,16 @@ export default function ProfilePage() {
 
         <AccountInformation account={account} />
         <RecoveryEmail account={account} />
+        <section className="card p-6">
+          <SectionHeading icon={<SectionIcon><IconMail className="h-5 w-5" /></SectionIcon>}
+            title="Notifications" description={account.role === 'inspector'
+              ? 'Choose which assignment and inspection updates arrive in your email.'
+              : 'Manage inspection email delivery, inspector preferences, and delivery history.'} />
+          <Link className="btn-secondary" to="/notifications?tab=settings">
+            {account.role === 'inspector' ? 'Manage email preferences' : 'Manage notification settings'}
+          </Link>
+          <p className="text-xs text-ink-muted mt-3">Login verification and account recovery emails remain enabled.</p>
+        </section>
         <ChangePassword account={account} />
       </div>
     </AppShell>

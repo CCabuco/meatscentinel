@@ -260,6 +260,9 @@ function RecordTable({ records }) {
             >
               <Td>
                 <InspectionId value={row.inspection_id} />
+                <p className="text-xs text-ink-muted mt-1" title={row.assignment?.inspector_user_id ?? ''}>
+                  Inspector: {row.assignment?.inspector_name ?? 'Unassigned'}
+                </p>
               </Td>
               <Td className="whitespace-nowrap">
                 {titleCaseSample(row.sample_type)}

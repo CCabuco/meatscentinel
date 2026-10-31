@@ -17,8 +17,7 @@ import {
   ROLE_LABEL,
 } from '../lib/accounts.js';
 
-// A-05 — administrators land here directly. There is no administrator
-// dashboard, and this page shows no inspection data of any kind.
+// Administrators land here directly and can also use the inspection modules.
 
 const TABS = [
   { id: 'all', label: 'All accounts' },

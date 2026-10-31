@@ -27,6 +27,25 @@ const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY')!;
 const MAIL_FROM_EMAIL = Deno.env.get('MAIL_FROM_EMAIL')!;
 const MAIL_FROM_NAME = Deno.env.get('MAIL_FROM_NAME') ?? 'MeatScentinel';
 
+// TEMPORARY DIAGNOSTIC. When LV_DEBUG=1 is set as a secret, mail failures
+// return the provider's reason in the response body instead of only in the
+// logs. Turn it OFF once sending works:
+//   npx.cmd supabase secrets unset LV_DEBUG
+// Leaving it on tells an unauthenticated caller about your mail
+// configuration, which is not dangerous but is needless.
+const LV_DEBUG = Deno.env.get('LV_DEBUG') === '1';
+
+// A missing secret produces a Brevo 401 that reads like a key problem when
+// it is actually a deployment problem. Name it precisely instead.
+function assertMailConfig() {
+  const missing = [];
+  if (!BREVO_API_KEY) missing.push('BREVO_API_KEY');
+  if (!MAIL_FROM_EMAIL) missing.push('MAIL_FROM_EMAIL');
+  if (missing.length) {
+    throw new Error(`Missing edge function secret(s): ${missing.join(', ')}`);
+  }
+}
+
 const CODE_TTL_SECONDS = 5 * 60;        // LV-02
 const IP_LIMIT = 20;                    // LV-10
 const IP_WINDOW_SECONDS = 15 * 60;
@@ -80,6 +99,7 @@ function clientKey(req: Request): string {
 }
 
 async function sendCodeEmail(to: string, code: string) {
+  assertMailConfig();
   // Deliberately minimal: no display name, no User ID, no account type.
   // If the registered address is wrong, this leaks nothing about whose
   // account it belongs to.
@@ -273,7 +293,12 @@ Deno.serve(async (req) => {
 
     try {
       await sendCodeEmail(email, code);
-    } catch (_err) {
+    } catch (err) {
+      // Surface the reason in the function logs. Brevo's rejection body
+      // names the cause — unverified sender, bad key, quota — and without
+      // this the operator sees only a 502.
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error('BREVO SEND FAILED:', detail);
       // The challenge exists but the code never left. Consume it rather
       // than leaving a live challenge nobody can answer.
       await admin
@@ -281,7 +306,11 @@ Deno.serve(async (req) => {
         .update({ consumed_at: new Date().toISOString() })
         .eq('id', challenge.id);
       return json(
-        { error: 'Could not send the verification code. Try again shortly.' },
+        {
+          error: LV_DEBUG
+            ? `MAIL FAILED — ${detail}`
+            : 'Could not send the verification code. Try again shortly.',
+        },
         502,
       );
     }
@@ -292,7 +321,8 @@ Deno.serve(async (req) => {
       client_secret: clientSecret,
       expires_in: CODE_TTL_SECONDS,
     });
-  } catch (_err) {
+  } catch (err) {
+    console.error('LOGIN-BEGIN FAILED:', err instanceof Error ? err.stack ?? err.message : String(err));
     return json({ error: 'Unable to start sign-in. Try again.' }, 500);
   }
 });

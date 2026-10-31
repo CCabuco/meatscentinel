@@ -134,11 +134,15 @@ export function AuthProvider({ children }) {
   }, [loadAccount, session]);
 
   const signOut = useCallback(async () => {
+    if (account?.role === 'inspector') {
+      const { error } = await supabase.rpc('end_inspector_session');
+      if (error) throw error;
+    }
     await doSignOut();
     setAccount(null);
     setSession(null);
     setSessionState('anonymous');
-  }, []);
+  }, [account?.role]);
 
   const value = {
     session,

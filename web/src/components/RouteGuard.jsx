@@ -3,11 +3,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 // Route guards are user experience, not security.
 //
-// The real boundary is Row Level Security (AD-05): an administrator's
-// token reads nothing from the inspection tables regardless of what the
-// client requests, and since 010 an unverified token reads nothing from
-// anywhere. These guards exist so people do not land on screens that
-// would render empty for them.
+// Row Level Security enforces inspection access for both roles and account
+// management for administrators. The database also requires an active
+// account and a verified session, regardless of what the client requests.
 //
 // One state needs care: a session that exists while its account row is
 // still being fetched. Supabase fires several auth events in quick
@@ -41,13 +39,13 @@ export function RequireAuth({ children }) {
   return children;
 }
 
-export function RequireRole({ role, children }) {
+export function RequireRole({ roles, children }) {
   const auth = useAuth();
 
   if (stillResolving(auth)) return <FullPageLoading />;
   if (!auth.session || !auth.account) return <Navigate to="/login" replace />;
 
-  if (auth.account.role !== role) {
+  if (!roles.includes(auth.account.role)) {
     return <Navigate to={landingPathFor(auth.account.role)} replace />;
   }
   return children;
@@ -64,8 +62,7 @@ export function RedirectIfAuthenticated({ children }) {
   return children;
 }
 
-// A-05 — administrators land directly on the account list. There is no
-// administrator dashboard.
+// Administrators land on account management and can navigate to inspections.
 export function landingPathFor(role) {
   return role === 'administrator' ? '/accounts' : '/dashboard';
 }

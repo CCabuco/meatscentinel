@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell.jsx';
 import Modal from '../components/Modal.jsx';
+import ActivityResults from '../components/ActivityResults.jsx';
+import { reportInspectionView } from '../lib/activity.js';
 import { ClassificationBadge } from '../components/Badge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime, formatPpm, titleCaseSample } from '../lib/format.js';
@@ -24,14 +26,43 @@ export default function RecordDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [activityError, setActivityError] = useState(false);
+  const loadSequence = useRef(0);
+  const visit = useMemo(() => ({
+    record_viewed: crypto.randomUUID(), image_viewed: crypto.randomUUID(),
+    sent: new Set(), pending: new Set(), displayed: new Set(), failed: new Set(),
+  }), [inspectionId, account.id]);
+  const currentVisit = useRef(visit);
+  currentVisit.current = visit;
+
+  const reportView = useCallback(async (action) => {
+    if (account.role !== 'inspector') return;
+    visit.displayed.add(action);
+    if (visit.sent.has(action) || visit.pending.has(action)) return;
+    visit.pending.add(action);
+    try {
+      await reportInspectionView(action, inspectionId, visit[action]);
+      visit.sent.add(action);
+      visit.failed.delete(action);
+      if (currentVisit.current === visit) setActivityError(visit.failed.size > 0);
+    } catch {
+      visit.failed.add(action);
+      if (currentVisit.current === visit) setActivityError(true);
+    } finally {
+      visit.pending.delete(action);
+    }
+  }, [account.role, inspectionId, visit]);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [remarkOpen, setRemarkOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
+    setImageUrl(null);
     const { record: row, error: recordError } = await getRecord(inspectionId);
+    if (sequence !== loadSequence.current) return;
 
     if (recordError || !row) {
       setError(recordError ?? 'That inspection record was not found.');
@@ -40,19 +71,27 @@ export default function RecordDetailPage() {
     }
 
     const { timeline: entries } = await getTimeline(inspectionId);
+    if (sequence !== loadSequence.current) return;
     setRecord(row);
     setTimeline(entries);
     setError(null);
     setLoading(false);
 
     if (row.image_path) {
-      setImageUrl(await getImageUrl(row.image_path));
+      const url = await getImageUrl(row.image_path);
+      if (sequence === loadSequence.current) setImageUrl(url);
     }
   }, [inspectionId]);
 
   useEffect(() => {
+    setActivityError(false);
     load();
+    return () => { loadSequence.current += 1; };
   }, [load]);
+
+  useEffect(() => {
+    if (!loading && !error && record?.inspection_id === inspectionId) reportView('record_viewed');
+  }, [loading, error, record?.inspection_id, inspectionId, reportView]);
 
   if (loading) {
     return (
@@ -99,11 +138,20 @@ export default function RecordDetailPage() {
         </div>
       )}
 
+      {activityError && (
+        <div className="alert-notice mb-4 flex items-center justify-between gap-3" role="status">
+          <span>Your viewing activity could not be recorded.</span>
+          <button className="btn-secondary text-xs" onClick={() => {
+            for (const action of visit.displayed) reportView(action);
+          }}>Retry</button>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <FusionPanel record={record} />
           <DetailPanel record={record} currentStatus={currentStatus} />
-          <ImagePanel record={record} imageUrl={imageUrl} />
+          <ImagePanel record={record} imageUrl={imageUrl} onViewed={() => reportView('image_viewed')} />
         </div>
 
         <div className="space-y-6">
@@ -125,6 +173,7 @@ export default function RecordDetailPage() {
         onClose={() => setHistoryOpen(false)}
         inspectionId={record.inspection_id}
         timeline={timeline}
+        showViewingActivity={account.role === 'administrator'}
       />
 
       <CreateRemarkModal
@@ -223,6 +272,9 @@ function DetailPanel({ record, currentStatus }) {
       <h2 className="mb-4">Inspection details</h2>
       <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
         <Detail label="Inspection ID" value={record.inspection_id} mono />
+        <Detail label="Assigned inspector" value={record.assignment?.inspector_name
+          ? `${record.assignment.inspector_name} (${record.assignment.inspector_user_id})` : 'Unassigned'} />
+        {record.assignment?.scan_id && <Detail label="Linked mobile scan" value={record.assignment.scan_id} mono />}
         <Detail label="Sample type" value={titleCaseSample(record.sample_type)} />
         <Detail
           label="Source type"
@@ -255,7 +307,7 @@ function Detail({ label, value, mono = false }) {
   );
 }
 
-function ImagePanel({ record, imageUrl }) {
+function ImagePanel({ record, imageUrl, onViewed }) {
   if (!record.has_image_submission) return null;
 
   return (
@@ -268,6 +320,7 @@ function ImagePanel({ record, imageUrl }) {
       {imageUrl ? (
         <img
           src={imageUrl}
+          onLoad={onViewed}
           alt={`Inspection sample for ${record.inspection_id}`}
           className="rounded-lg border border-surface-line max-h-80 object-contain bg-surface-sunken"
         />
@@ -346,11 +399,11 @@ function StatusPanel({ currentStatus, onChange }) {
 
 // V-14, V-15 — the combined chronological timeline, with every entry's author
 // and timestamp.
-function HistoryModal({ open, onClose, inspectionId, timeline }) {
+function HistoryModal({ open, onClose, inspectionId, timeline, showViewingActivity }) {
   return (
     <Modal
       open={open}
-      title="Remarks and status history"
+      title={showViewingActivity ? 'Inspection history' : 'Remarks and status history'}
       description={`Complete record for ${inspectionId}, oldest first.`}
       onClose={onClose}
       footer={
@@ -384,6 +437,16 @@ function HistoryModal({ open, onClose, inspectionId, timeline }) {
             </li>
           ))}
         </ol>
+      )}
+      {open && showViewingActivity && (
+        <section className="mt-6 border-t border-surface-line pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <h3 className="text-sm font-medium">Inspector viewing history</h3>
+            <Link to={`/activity?inspectionId=${encodeURIComponent(inspectionId)}`} className="text-xs text-brand-600">All related activity</Link>
+          </div>
+          <p className="text-xs text-ink-faint mb-3">Newest first · Philippine time (UTC+8)</p>
+          <ActivityResults key={inspectionId} filters={{ inspectionId, viewsOnly: true }} compact />
+        </section>
       )}
     </Modal>
   );
