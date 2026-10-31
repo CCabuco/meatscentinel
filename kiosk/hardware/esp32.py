@@ -21,11 +21,8 @@ error just makes the snapshot go stale, which reads as "unavailable"
 (None) — the same graceful degradation as the old GPIO adapters.
 """
 import logging
-import platform
 import threading
 import time
-
-from hardware.mock import MockEsp32Controller
 
 log = logging.getLogger("meatsentinel.hardware.esp32")
 
@@ -157,41 +154,9 @@ class Esp32Controller:
         self._stop.set()
 
 
-def _is_raspberry_pi() -> bool:
-    return platform.machine() in ("armv7l", "aarch64")
-
-
-def _probe(cfg: dict) -> bool:
-    try:
-        import requests
-
-        resp = requests.get(f"{cfg['base_url'].rstrip('/')}/api", timeout=cfg["request_timeout_s"])
-        return resp.ok
-    except Exception:
-        return False
-
-
-def build_esp32_controller(cfg: dict, hardware_mode: str = "auto"):
-    if hardware_mode == "mock":
-        log.info("ESP32: mock mode forced by config.")
-        return MockEsp32Controller()
-
-    # On the Pi, "auto" never falls back to mock: the ESP32 may simply not
-    # have booted yet, and silently faking readings there would upload
-    # made-up results. The real client just reports "unavailable" until
-    # the ESP32 answers. Off-Pi, use the real ESP32 only if it's reachable.
-    if hardware_mode == "auto" and not _is_raspberry_pi() and not _probe(cfg):
-        log.warning("ESP32: not reachable at %s from a dev machine. Falling back to mock.",
-                    cfg["base_url"])
-        return MockEsp32Controller()
-
-    try:
-        controller = Esp32Controller(cfg)
-    except Exception as exc:  # requests missing, bad config, etc.
-        if hardware_mode == "real":
-            raise RuntimeError(f"ESP32 init failed and hardware_mode=real: {exc}")
-        log.warning("ESP32: client unavailable (%s). Falling back to mock.", exc)
-        return MockEsp32Controller()
-
+def build_esp32_controller(cfg: dict):
+    # Always the real ESP32 — readings are never faked. If it hasn't booted
+    # yet, status just reads as "unavailable" until it answers.
+    controller = Esp32Controller(cfg)
     log.info("ESP32: HTTP controller polling %s.", cfg["base_url"])
     return controller

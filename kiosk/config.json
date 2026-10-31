@@ -24,6 +24,5 @@
   },
   "log_file": "inspection.log",
   "log_max_bytes": 5242880,
-  "log_backup_count": 3,
-  "hardware_mode": "auto"
+  "log_backup_count": 3
 }

@@ -5,9 +5,8 @@ Raspberry Pi 4 + 3.5" touchscreen, Kivy UI, Supabase backend.
 Sensors (HX711 presence, MQ-136/MQ-137 gas) and the exhaust fan live on an
 ESP32 that the kiosk talks to over HTTP (hardware/esp32.py).
 
-Run directly with `python main.py`. On a dev laptop that can't reach the
-ESP32, falls back to a mock hardware layer automatically, so this also runs
-fine for building/testing the UI and logic.
+Run directly with `python main.py`. The machine running it must be able to
+reach the ESP32 at esp32.base_url in config.json.
 """
 import json
 import logging
@@ -35,9 +34,8 @@ Config.set("kivy", "exit_on_escape", "1")
 # imported: the window is created from these Config values at import time.
 Config.set("graphics", "fullscreen", "auto")
 
-# Kiosk mode: no window manager chrome and no visible mouse pointer.
+# Kiosk mode: no window manager chrome.
 Config.set("graphics", "borderless", "1")
-Config.set("graphics", "show_cursor", "0")
 
 from kivy.core.window import Window
 from kivy.lang import Builder
@@ -104,9 +102,8 @@ class MeatSentinelApp(App):
         # Global exception handler (S.6)
         ExceptionManager.add_handler(KioskExceptionHandler(self))
 
-        # Hardware layer (S.3 — graceful fallback if a sensor isn't detected)
-        hardware_mode = self.config.get("hardware_mode", "auto")
-        self.esp32 = build_esp32_controller(self.config["esp32"], hardware_mode)
+        # Hardware layer (S.3 — reads as "unavailable" until the ESP32 answers)
+        self.esp32 = build_esp32_controller(self.config["esp32"])
 
         # Local storage (Module 1.4 persistence, Module 5.3 offline queue)
         self.state_store = KioskStateStore(os.path.join(BASE_DIR, "kiosk_state.db"))

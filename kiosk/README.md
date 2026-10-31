@@ -16,11 +16,9 @@ thresholds.json           NH3 / H2S thresholds per meat type
 device.json                Fallback device id (real id read from /etc/machine-id)
 .env.example                Supabase credentials template — copy to .env
 
-hardware/                Sensor/fan adapter — HTTP client for the ESP32, with
-                          automatic fallback to a mock layer off-Pi
+hardware/                Sensor/fan adapter — HTTP client for the ESP32
   esp32.py                  HX711 presence, MQ-137 (NH3) / MQ-136 (H2S),
                             exhaust fan relay (Modules 2, 3, 6)
-  mock.py
 
 services/                 Non-UI logic
   db.py                     SQLite: last-selection state + offline queue
@@ -69,16 +67,13 @@ duplicate-key error or an immutability rejection.
 verdict) and everything in `image_submissions`/`accounts`/`remarks` is
 the web app's responsibility — the kiosk never touches them.
 
-## Running on a dev laptop (no Raspberry Pi needed)
+## Running on a laptop
 
 All chamber hardware lives on an ESP32 (`SYS07_ESP32_Dashboard.ino`)
-that the kiosk drives over HTTP. On a non-Pi machine with
-`hardware_mode: "auto"`, the kiosk probes `esp32.base_url` once at
-startup and, if the ESP32 isn't reachable, transparently uses the mock
-in `hardware/mock.py` (which enforces the same start → end → fan order
-as the firmware), so the full UI and flow can be built and tested on a
-normal computer. On the Pi, `auto` always uses the real ESP32 and shows
-"unavailable" states until it answers, rather than faking readings.
+that the kiosk drives over HTTP, so the kiosk runs on any machine that
+can reach `esp32.base_url`. There is no simulated hardware: until the
+ESP32 answers, the screens show "unavailable" states rather than faking
+readings.
 
 ```bash
 python -m venv venv
@@ -89,8 +84,7 @@ python main.py
 ```
 
 On the placement screen, Start Detection unlocks only once the ESP32's
-HX711 weight sensor reports an object present. In mock mode a simulated
-sample "lands" about 3 seconds after the screen opens.
+HX711 weight sensor reports an object present.
 
 ## Deploying to the Raspberry Pi kiosk
 
@@ -100,11 +94,9 @@ sample "lands" about 3 seconds after the screen opens.
    `esp32.base_url` in `config.json` to the ESP32's address on it.
 2. `pip install -r requirements.txt` inside a venv on the Pi.
 3. Calibrate the touchscreen (`xinput_calibrator`) — see System feature S.2.
-4. Set `hardware_mode` in `config.json` to `"real"` once you want the app
-   to fail loudly instead of silently falling back to mock sensors.
-5. Run `deploy/install_service.sh` to install and enable the systemd
+4. Run `deploy/install_service.sh` to install and enable the systemd
    service so the kiosk launches on boot with no desktop shown.
-6. Fill in `.env` with the shared Supabase project's URL and service-role
+5. Fill in `.env` with the shared Supabase project's URL and service-role
    key (ask the web app team) — see "Shared Supabase schema" above for
    what the kiosk expects to already exist. Optionally enable Realtime on
    `gas_submissions` (Database > Replication in the dashboard) so the
