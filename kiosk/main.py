@@ -103,7 +103,15 @@ class MeatSentinelApp(App):
         ExceptionManager.add_handler(KioskExceptionHandler(self))
 
         # Hardware layer (S.3 — reads as "unavailable" until the ESP32 answers)
-        self.esp32 = build_esp32_controller(self.config["esp32"])
+        # Simulation (no ESP32): only when KIOSK_SIMULATION=1 is set, e.g. in kiosk/.env.
+        # Everything it records is labelled: IDs start with SIM- and the device is "simulator".
+        from dotenv import load_dotenv
+        load_dotenv(os.path.join(BASE_DIR, ".env"))
+        self.simulation = os.getenv("KIOSK_SIMULATION", "").strip().lower() in ("1", "true", "yes", "on")
+        if self.simulation:
+            self.device_id = "simulator"
+            self.log.warning("SIMULATION MODE: no ESP32. Uploads are labelled SIM- / device 'simulator'.")
+        self.esp32 = build_esp32_controller(self.config["esp32"], simulate=self.simulation)
 
         # Local storage (Module 1.4 persistence, Module 5.3 offline queue)
         self.state_store = KioskStateStore(os.path.join(BASE_DIR, "kiosk_state.db"))
@@ -142,10 +150,29 @@ class MeatSentinelApp(App):
         self.screen_manager = sm
 
         Window.clearcolor = (0.9882, 0.9725, 0.9725, 1)
-        return sm
+        if not self.simulation:
+            return sm
+
+        # Always-visible banner so a simulated run can't be mistaken for a real one.
+        from kivy.uix.floatlayout import FloatLayout
+        from kivy.uix.label import Label
+        from kivy.graphics import Color, Rectangle
+        root = FloatLayout()
+        root.add_widget(sm)
+        banner = Label(text="SIMULATION — no ESP32, readings are generated", bold=True,
+                       color=(1, 1, 1, 1), font_size=Window.height * 0.035,
+                       size_hint=(1, None), height=Window.height * 0.06, pos_hint={"x": 0, "top": 1})
+        with banner.canvas.before:
+            Color(0.84, 0.27, 0.27, 1)
+            banner._bg = Rectangle(pos=banner.pos, size=banner.size)
+        banner.bind(pos=lambda w, v: setattr(w._bg, "pos", v), size=lambda w, v: setattr(w._bg, "size", v))
+        root.add_widget(banner)
+        self.title = "MeatSentinel Kiosk (SIMULATION)"
+        return root
 
     def reset_inspection_state(self):
-        self.inspection_id = str(uuid.uuid4())
+        prefix = "SIM-" if getattr(self, "simulation", False) else ""
+        self.inspection_id = prefix + str(uuid.uuid4())
         self.selected_meat_type = None
         self.selected_thresholds = None
         self.detection_result = None

@@ -92,6 +92,23 @@ python main.py
 On the placement screen, Start Detection unlocks only once the ESP32's
 HX711 weight sensor reports an object present.
 
+## Simulation mode (no ESP32)
+
+To test the kiosk flow and the database upload without the chamber, set
+`KIOSK_SIMULATION=1` in `.env` and start the kiosk as usual.
+
+- A red **SIMULATION** banner stays on screen the whole time.
+- The placement screen gets two extra buttons: **Sim: Place sample /
+  Remove sample** and **Sim reading: Fresh / Spoiled / Unstable**.
+- The simulated ESP32 follows the firmware rules: Start needs a sample,
+  removing the sample cancels a measurement, the fan needs a finished
+  measurement and stops itself after 30 s.
+- Uploads are labelled: inspection IDs start with `SIM-` and the device ID is
+  `simulator`, so they are easy to tell apart on the website. They go to the
+  real database and cannot be deleted from the website, so use it sparingly.
+
+Set `KIOSK_SIMULATION=0` (or remove the line) before real inspections.
+
 ## Deploying to the Raspberry Pi kiosk
 
 1. Flash the ESP32 with `SYS07_ESP32_Dashboard.ino` (sensors and fan

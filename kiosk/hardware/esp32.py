@@ -154,9 +154,13 @@ class Esp32Controller:
         self._stop.set()
 
 
-def build_esp32_controller(cfg: dict):
-    # Always the real ESP32 — readings are never faked. If it hasn't booted
-    # yet, status just reads as "unavailable" until it answers.
+def build_esp32_controller(cfg: dict, simulate: bool = False):
+    # The real ESP32 unless simulation was switched on explicitly
+    # (KIOSK_SIMULATION=1). If the real one hasn't booted yet, status just
+    # reads as "unavailable" until it answers.
+    if simulate:
+        from hardware.esp32_sim import SimulatedEsp32
+        return SimulatedEsp32(cfg)
     controller = Esp32Controller(cfg)
     log.info("ESP32: HTTP controller polling %s.", cfg["base_url"])
     return controller

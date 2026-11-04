@@ -30,6 +30,15 @@
                 size_hint_y: None
                 height: Window.height * 0.08
 
+        # Simulation controls (filled in by placement.py only when KIOSK_SIMULATION=1).
+        BoxLayout:
+            id: sim_panel
+            orientation: 'horizontal'
+            spacing: Window.width * 0.02
+            size_hint_y: None
+            height: 0
+            opacity: 0
+
         PrimaryButton:
             id: start_detection_btn
             text: 'Start Detection'
