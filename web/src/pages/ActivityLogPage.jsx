@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import ActivityResults from '../components/ActivityResults.jsx';
 import { ACTIVITY_ACTIONS } from '../lib/activity.js';
@@ -60,7 +60,7 @@ export default function ActivityLogPage() {
         </form>
         <ActivityResults key={JSON.stringify(filters)} filters={filters} refreshKey={refresh} />
       </div>
-      <p className="text-xs text-ink-faint mt-4 leading-relaxed">System records confirm completed changes. Viewing events are reported when the app displays a record or loads its image. Closing a browser is not a sign-out event. Activity entries cannot be edited or deleted.</p>
+      <p className="text-xs text-ink-faint mt-4 leading-relaxed">System records confirm completed changes. Viewing events are reported when the app displays a record or loads its image. Closing a browser is not a sign-out event. Activity entries cannot be edited or deleted. MSafe report actions (claims, assignments, linked inspections and sent responses) are recorded in each report's History on the <Link className="text-brand-700 underline" to="/msafe-reports">MSafe reports</Link> page.</p>
     </AppShell>
   );
 }

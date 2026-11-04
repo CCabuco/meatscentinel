@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { requestPasswordRecovery } from '../lib/auth.js';
+import PublicLayout from '../components/PublicLayout.jsx';
 
 // V-12b — the user enters their User ID. The system resolves the mapped
 // email and sends the recovery link there. The email address is never
@@ -28,8 +29,7 @@ export default function RecoveryPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-6 py-12 bg-surface-sunken">
-      <div className="w-full max-w-sm">
+    <PublicLayout title="Reset password">
         <h1 className="mb-1">Reset your password</h1>
         <p className="text-sm text-ink-muted mb-6">
           Enter your User ID and we will send a reset link to the email
@@ -86,7 +86,6 @@ export default function RecoveryPage() {
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </PublicLayout>
   );
 }

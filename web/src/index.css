@@ -11,6 +11,12 @@
   }
   h1 { @apply text-xl font-medium text-ink; }
   h2 { @apply text-base font-medium text-ink; }
+
+  /* One focus style everywhere: the same pink ring the text boxes use,
+     shown for keyboard focus on buttons, links and other controls. */
+  :focus-visible:not(.input) {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-surface;
+  }
 }
 
 @layer components {
@@ -25,7 +31,7 @@
   .input {
     @apply w-full rounded-lg border border-surface-line bg-surface px-3 py-2 text-sm text-ink
            placeholder:text-ink-faint
-           focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500
+           focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500
            disabled:bg-surface-sunken disabled:text-ink-faint;
   }
 

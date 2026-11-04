@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AppShell from '../components/AppShell.jsx';
 import Modal from '../components/Modal.jsx';
+import { usePageTitle } from '../components/PublicLayout.jsx';
 import ActivityResults from '../components/ActivityResults.jsx';
 import { reportInspectionView } from '../lib/activity.js';
 import { ClassificationBadge } from '../components/Badge.jsx';
@@ -18,6 +19,7 @@ import {
 
 export default function RecordDetailPage() {
   const { inspectionId } = useParams();
+  usePageTitle(`Record ${inspectionId}`);
   const { account } = useAuth();
 
   const [record, setRecord] = useState(null);
@@ -273,8 +275,24 @@ function DetailPanel({ record, currentStatus }) {
       <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
         <Detail label="Inspection ID" value={record.inspection_id} mono />
         <Detail label="Assigned inspector" value={record.assignment?.inspector_name
-          ? `${record.assignment.inspector_name} (${record.assignment.inspector_user_id})` : 'Unassigned'} />
+          ? `${record.assignment.inspector_name}${record.assignment.inspector_user_id ? ` (${record.assignment.inspector_user_id})` : ''}`
+          : 'Unassigned'} />
         {record.assignment?.scan_id && <Detail label="Linked mobile scan" value={record.assignment.scan_id} mono />}
+        {record.msafeReports?.length > 0 && (
+          <Detail
+            label={record.msafeReports.length === 1 ? 'Linked MSafe report' : 'Linked MSafe reports'}
+            value={
+              <span className="flex flex-col gap-1">
+                {record.msafeReports.map((r) => (
+                  <Link key={r.msafe_report_id} className="text-brand-700 underline"
+                    to={`/msafe-reports?report=${encodeURIComponent(r.msafe_report_id)}`}>
+                    <span className="capitalize">{r.report_type}</span> report · {r.inspector_name ?? 'Unassigned'}
+                  </Link>
+                ))}
+              </span>
+            }
+          />
+        )}
         <Detail label="Sample type" value={titleCaseSample(record.sample_type)} />
         <Detail
           label="Source type"

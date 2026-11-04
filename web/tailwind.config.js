@@ -7,7 +7,7 @@ export default {
         ink: {
           DEFAULT: '#1c1c1a',
           muted: '#5f5e5a',
-          faint: '#888780',
+          faint: '#6f6e69',
         },
         surface: {
           DEFAULT: '#ffffff',

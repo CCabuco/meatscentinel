@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatActivityTime } from '../lib/activity.js';
@@ -29,30 +29,51 @@ function mapLink(lat, lng) {
   return lat == null || lng == null ? null : `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
+const STATUS_FILTERS = [['all', 'All statuses'], ['new', 'New'], ...MSAFE_STATUSES.map((st) => [st.id, st.label])];
+const pick = (value, options, fallback) => (options.some(([id]) => id === value) ? value : fallback);
+
 export default function MsafeReportsPage() {
   const { account } = useAuth();
   const admin = account?.role === 'administrator';
-  const [type, setType] = useState('all');
-  const [view, setView] = useState('all');
+  const views = [['all', 'All reports'], ['unassigned', 'Unassigned'], ...(!admin ? [['mine', 'Assigned to me']] : [['assigned', 'Assigned']])];
+
+  // Filters live in the URL so Dashboard counters and record links can
+  // open this page already filtered (?view=unassigned, ?status=new,
+  // ?report=<id>).
+  const [params, setParams] = useSearchParams();
+  const view = pick(params.get('view'), views, 'all');
+  const type = pick(params.get('type'), TYPE_FILTERS, 'all');
+  const status = pick(params.get('status'), STATUS_FILTERS, 'all');
+  const selectedId = params.get('report');
+
+  function update(changes) {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) {
+      if (!value || value === 'all') next.delete(key); else next.set(key, value);
+    }
+    setParams(next, { replace: true });
+  }
+
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
-  const [selectedId, setSelectedId] = useState(null);
+
+  useEffect(() => { setPage(0); }, [type, view, status]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError('');
-    listMsafeReports({ type, view, accountId: account.id, page })
+    listMsafeReports({ type, view, status, accountId: account.id, page })
       .then((r) => { if (!cancelled) { setRows(r.rows); setTotal(r.total); } })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [type, view, page, account.id, revision]);
+  }, [type, view, status, page, account.id, revision]);
 
-  const views = [['all', 'All reports'], ['unassigned', 'Unassigned'], ...(!admin ? [['mine', 'Assigned to me']] : [])];
+  const filtered = view !== 'all' || type !== 'all' || status !== 'all';
 
   return <AppShell>
     <PageHeader title="MSafe reports" description="Spoiled-meat reports sent by MSafe users and suppliers." />
@@ -62,21 +83,27 @@ export default function MsafeReportsPage() {
       Internal notes are never sent.
     </div>
     <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <div className="flex flex-wrap gap-2" aria-label="Report view">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Report view">
         {views.map(([id, label]) => <button key={id} className={view === id ? 'btn-primary' : 'btn-secondary'}
-          aria-pressed={view === id} onClick={() => { setView(id); setPage(0); }}>{label}</button>)}
+          aria-pressed={view === id} onClick={() => update({ view: id })}>{label}</button>)}
       </div>
-      <div className="flex gap-2">
-        <select aria-label="Report type" className="input" value={type} onChange={(e) => { setType(e.target.value); setPage(0); }}>
+      <div className="flex flex-wrap gap-2">
+        <select aria-label="Report status" className="input w-auto" value={status} onChange={(e) => update({ status: e.target.value })}>
+          {STATUS_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+        </select>
+        <select aria-label="Report type" className="input w-auto" value={type} onChange={(e) => update({ type: e.target.value })}>
           {TYPE_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
         </select>
         <button className="btn-secondary" disabled={loading} onClick={() => setRevision((v) => v + 1)}>Refresh</button>
       </div>
     </div>
 
-    {error ? <div role="alert" className="card p-5"><p>{error}</p><button className="btn-secondary mt-3" onClick={() => setRevision((v) => v + 1)}>Retry</button></div>
-      : loading ? <p role="status">Loading reports…</p>
-      : rows.length === 0 ? <div className="card p-8 text-center text-ink-muted">No MSafe reports match this view.</div>
+    {error ? <div role="alert" className="alert-error"><p>{error}</p><button className="btn-secondary mt-3" onClick={() => setRevision((v) => v + 1)}>Retry</button></div>
+      : loading ? <p role="status" className="text-sm text-ink-faint">Loading reports…</p>
+      : rows.length === 0 ? <div className="card p-8 text-center text-sm text-ink-muted">
+          No MSafe reports match this view.
+          {filtered && <div className="mt-3"><button className="btn-secondary" onClick={() => setParams({}, { replace: true })}>Clear filters</button></div>}
+        </div>
       : <div className="space-y-3">{rows.map((report) => <article className="card p-5" key={report.msafe_report_id}>
         <div className="flex flex-wrap justify-between gap-3">
           <div>
@@ -87,7 +114,7 @@ export default function MsafeReportsPage() {
             <p className="text-xs font-mono text-ink-faint break-all mt-1">{report.msafe_report_id}</p>
           </div>
           <div className="flex items-center gap-3"><StatusTag status={report.latest_status} />
-            <button className="btn-secondary" onClick={() => setSelectedId(report.msafe_report_id)}>View report</button></div>
+            <button className="btn-secondary" onClick={() => update({ report: report.msafe_report_id })}>View report</button></div>
         </div>
         <dl className="grid sm:grid-cols-4 gap-3 mt-4 text-sm">
           <Field label="Received">{formatActivityTime(report.received_at)}</Field>
@@ -100,7 +127,7 @@ export default function MsafeReportsPage() {
       </article>)}</div>}
 
     <div className="flex justify-between items-center mt-5 text-sm">
-      <span>{total} reports · Page {page + 1}</span>
+      <span className="text-ink-muted">{total} {total === 1 ? 'report' : 'reports'} · Page {page + 1} of {Math.max(1, Math.ceil(total / MSAFE_PAGE_SIZE))}</span>
       <div className="flex gap-2">
         <button className="btn-secondary" disabled={loading || page === 0} onClick={() => setPage((p) => p - 1)}>Previous</button>
         <button className="btn-secondary" disabled={loading || (page + 1) * MSAFE_PAGE_SIZE >= total} onClick={() => setPage((p) => p + 1)}>Next</button>
@@ -108,7 +135,7 @@ export default function MsafeReportsPage() {
     </div>
 
     {selectedId && <ReportDialog key={selectedId} reportId={selectedId} account={account}
-      onClose={() => { setSelectedId(null); setRevision((v) => v + 1); }} />}
+      onClose={() => { update({ report: null }); setRevision((v) => v + 1); }} />}
   </AppShell>;
 }
 
@@ -131,6 +158,7 @@ function ReportDialog({ reportId, account, onClose }) {
   const [editingId, setEditingId] = useState(null);
   const [editingTime, setEditingTime] = useState(null);
   const formRef = useRef(null);
+  const assignRef = useRef(null);
   const [sendTarget, setSendTarget] = useState(null);
   const [showPhoto, setShowPhoto] = useState(false);
 
@@ -179,17 +207,48 @@ function ReportDialog({ reportId, account, onClose }) {
 
   const supplier = report?.report_type === 'supplier';
 
+  function jumpTo(ref) {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    requestAnimationFrame(() => ref.current?.querySelector('select, textarea, input, button')?.focus({ preventScroll: true }));
+  }
+
+  // The one thing to do next, shown at the top so nobody has to scroll for it.
+  let nextAction = null;
+  if (report && !report.inspector_id && !admin) {
+    nextAction = <button className="btn-primary" disabled={busy} onClick={() => act(() => claimMsafeReport(report), 'You claimed this report.')}>Claim report</button>;
+  } else if (report && !report.inspector_id && admin) {
+    nextAction = <button className="btn-primary" disabled={busy} onClick={() => jumpTo(assignRef)}>Assign inspector</button>;
+  } else if (canRespond) {
+    nextAction = <button className="btn-primary" disabled={busy} onClick={() => jumpTo(formRef)}>{mine.length ? 'Review drafts' : 'Write response'}</button>;
+  }
+
   return <dialog ref={dialog} onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
-    className="rounded-xl p-0 w-full max-w-2xl max-h-[90vh] overflow-y-auto backdrop:bg-black/40" aria-labelledby="msafe-title">
-    <div className="p-6 space-y-5">
+    className="card p-0 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-lg text-ink backdrop:bg-ink/40" aria-labelledby="msafe-title">
+    {/* Same look as the other pop-ups (Modal): title bar, body, divider lines. */}
+    <div className="sticky top-0 z-10 bg-surface border-b border-surface-line px-6 pt-5 pb-4 space-y-3">
       <div className="flex justify-between gap-3">
-        <h2 id="msafe-title" className="capitalize">{report ? `${report.report_type} report` : 'MSafe report'}</h2>
-        <button className="btn-secondary" disabled={busy} onClick={onClose}>Close</button>
+        <div className="min-w-0">
+          <h2 id="msafe-title" className="capitalize">{report ? `${report.report_type} report` : 'MSafe report'}</h2>
+          {report && <p className="font-mono text-xs text-ink-faint break-all mt-0.5">{report.msafe_report_id}</p>}
+        </div>
+        <button className="btn-secondary self-start" disabled={busy} onClick={onClose}>Close</button>
       </div>
-      {loadError && <div role="alert" className="text-sm">{loadError} <button className="btn-secondary ml-2" onClick={load}>Retry</button></div>}
-      {!report && !loadError && <p role="status">Loading…</p>}
+      {report && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-sunken border border-surface-line px-3 py-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <StatusTag status={report.latest_status} />
+          <span><span className="text-ink-muted">Inspector: </span>{report.inspector_name ?? 'Unassigned'}{assignedToMe && ' (you)'}</span>
+          <span><span className="text-ink-muted">Sent: </span>{responses.length}</span>
+          {mine.length > 0 && <span><span className="text-ink-muted">Your drafts: </span>{mine.length}</span>}
+        </div>
+        {nextAction}
+      </div>}
+      {error && <p role="alert" className="alert-error">{error}</p>}
+      {notice && <p role="status" className="alert-success">{notice}</p>}
+    </div>
+    <div className="px-6 py-5 space-y-5">
+      {loadError && <div role="alert" className="alert-error">{loadError} <button className="btn-secondary ml-2" onClick={load}>Retry</button></div>}
+      {!report && !loadError && <p role="status" className="text-sm text-ink-faint">Loading…</p>}
       {report && <>
-        <p className="font-mono text-xs break-all">{report.msafe_report_id}</p>
 
         <section className="space-y-3">
           <h3 className="font-medium">Scan</h3>
@@ -236,7 +295,7 @@ function ReportDialog({ reportId, account, onClose }) {
           <p className="text-sm whitespace-pre-wrap break-words">{report.additional_details}</p>
         </section>}
 
-        <section className="border-t border-surface-line pt-4 space-y-3">
+        <section ref={assignRef} className="border-t border-surface-line pt-4 space-y-3 scroll-mt-48">
           <h3 className="font-medium">Assigned inspector</h3>
           <p className="text-sm">{report.inspector_name ?? 'Unassigned'}{assignedToMe && ' (you)'}</p>
           {admin ? <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); act(() => assignMsafeReport(report, assignTo), 'Assignment saved.'); }}>
@@ -288,6 +347,8 @@ function ReportDialog({ reportId, account, onClose }) {
                   <button className="btn-primary" disabled={busy} onClick={() => setSendTarget(d)}>Send to reporter</button>
                 </span></div>
               {d.findings && <p className="mt-2 whitespace-pre-wrap break-words">{d.findings}</p>}
+              {sendTarget?.draft_id === d.draft_id && <SendConfirm draft={d} busy={busy} onCancel={() => setSendTarget(null)}
+                onSend={async () => { if (await act(() => sendMsafeDraft(d.draft_id), 'Sent. MSafe will receive it the next time their server checks.')) { if (d.draft_id === editingId) { setEditingId(null); setEditingTime(null); setForm(EMPTY_FORM); } setSendTarget(null); } }} />}
             </li>)}</ul>}
         </section>}
 
@@ -299,17 +360,8 @@ function ReportDialog({ reportId, account, onClose }) {
           </li>)}</ul>
         </section>}
 
-        {sendTarget && <div role="alertdialog" aria-labelledby="send-title" className="rounded-lg border border-brand-100 bg-brand-50 p-4 text-sm space-y-3">
-          <p id="send-title" className="font-medium text-brand-700">Send this response to the reporter?</p>
-          <p>Status: {msafeStatusLabel(sendTarget.status)}. It will appear as "MeatScentinel Inspector". After sending it cannot be edited or deleted. Internal notes are not sent.</p>
-          <div className="flex gap-2">
-            <button className="btn-primary" disabled={busy} onClick={async () => { if (await act(() => sendMsafeDraft(sendTarget.draft_id), 'Sent. MSafe will receive it the next time their server checks.')) { if (sendTarget.draft_id === editingId) { setEditingId(null); setEditingTime(null); setForm(EMPTY_FORM); } setSendTarget(null); } }}>Send</button>
-            <button className="btn-secondary" disabled={busy} onClick={() => setSendTarget(null)}>Cancel</button>
-          </div>
-        </div>}
-
         {canRespond ? <form ref={formRef} onSubmit={saveDraft}
-          className={editingId ? 'rounded-lg border-2 border-brand-500 bg-brand-50 p-4 space-y-3' : 'border-t border-surface-line pt-4 space-y-3'}>
+          className={editingId ? 'rounded-lg border-2 border-brand-500 bg-brand-50 p-4 space-y-3 scroll-mt-48' : 'border-t border-surface-line pt-4 space-y-3 scroll-mt-48'}>
           <h3 className="font-medium">{editingId ? `Editing draft from ${formatActivityTime(editingTime)}` : 'New response draft'}</h3>
           {!editingId && <p className="text-xs text-ink-muted">Saving here creates a new draft. To change an existing draft, use its Edit button.</p>}
           <label className="block text-sm">Status
@@ -344,9 +396,20 @@ function ReportDialog({ reportId, account, onClose }) {
           </li>)}</ul>
         </section>}
 
-        {error && <p role="alert" className="text-sm text-state-spoiled">{error}</p>}
-        {notice && <p role="status" className="text-sm">{notice}</p>}
       </>}
     </div>
   </dialog>;
+}
+
+function SendConfirm({ draft, busy, onSend, onCancel }) {
+  const sendRef = useRef(null);
+  useEffect(() => { sendRef.current?.focus(); }, []);
+  return <div role="alertdialog" aria-labelledby={`send-${draft.draft_id}`} className="mt-3 rounded-lg border border-brand-100 bg-surface p-3 space-y-3">
+    <p id={`send-${draft.draft_id}`} className="font-medium text-brand-700">Send this response to the reporter?</p>
+    <p>Status: {msafeStatusLabel(draft.status)}. It will appear as "MeatScentinel Inspector". After sending it cannot be edited or deleted. Internal notes are not sent.</p>
+    <div className="flex gap-2">
+      <button ref={sendRef} className="btn-primary" disabled={busy} onClick={onSend}>Send</button>
+      <button className="btn-secondary" disabled={busy} onClick={onCancel}>Cancel</button>
+    </div>
+  </div>;
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { beginSignIn, verifyLoginCode, resendLoginCode } from '../lib/auth.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import PublicLayout from '../components/PublicLayout.jsx';
 
 // Sign-in is two steps (LV). Credentials, then a code sent to the
 // registered email address.
@@ -63,43 +64,27 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      <aside className="hidden lg:flex w-80 shrink-0 bg-surface border-r border-surface-line flex-col justify-between p-8">
-        <div>
-          <p className="text-sm font-medium text-ink">MeatScentinel</p>
-          <p className="text-xs text-ink-faint mt-0.5">Inspection portal</p>
-        </div>
-        <p className="text-xs text-ink-faint leading-relaxed">
-          An assistive inspection support tool. MeatScentinel does not replace
-          official inspection procedures, laboratory testing, or professional
-          judgment.
-        </p>
-      </aside>
-
-      <main className="flex-1 grid place-items-center px-6 py-12 bg-surface-sunken">
-        <div className="w-full max-w-sm">
-          {step === 'credentials' ? (
-            <CredentialStep
-              userId={userId}
-              setUserId={setUserId}
-              password={password}
-              setPassword={setPassword}
-              onSubmit={handleCredentials}
-              busy={busy}
-              error={error}
-              deactivated={deactivated}
-            />
-          ) : (
-            <CodeStep
-              challenge={challenge}
-              onRestart={restart}
-              error={error}
-              setError={setError}
-            />
-          )}
-        </div>
-      </main>
-    </div>
+    <PublicLayout title={step === 'credentials' ? 'Sign in' : 'Verification code'}>
+      {step === 'credentials' ? (
+        <CredentialStep
+          userId={userId}
+          setUserId={setUserId}
+          password={password}
+          setPassword={setPassword}
+          onSubmit={handleCredentials}
+          busy={busy}
+          error={error}
+          deactivated={deactivated}
+        />
+      ) : (
+        <CodeStep
+          challenge={challenge}
+          onRestart={restart}
+          error={error}
+          setError={setError}
+        />
+      )}
+    </PublicLayout>
   );
 }
 

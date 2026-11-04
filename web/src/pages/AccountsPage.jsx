@@ -13,7 +13,6 @@ import {
   createAccount,
   resetAccountPassword,
   checkAvailability,
-  ROLES,
   ROLE_LABEL,
 } from '../lib/accounts.js';
 
@@ -87,7 +86,7 @@ export default function AccountsPage() {
     <AppShell>
       <PageHeader
         title="Accounts"
-        description="Create and manage meat inspector and administrator accounts."
+        description="Create meat inspector accounts and manage existing accounts."
         actions={
           <button className="btn-primary" onClick={() => setCreating(true)}>
             New account
@@ -409,7 +408,7 @@ function CreateAccountModal({ open, onClose, onCreated }) {
       userId: form.userId.trim(),
       email: form.email.trim(),
       displayName: form.displayName.trim(),
-      role: form.role,
+      role: 'inspector',
       password: form.password,
     });
 
@@ -472,18 +471,12 @@ function CreateAccountModal({ open, onClose, onCreated }) {
               <label className="label" htmlFor="newRole">
                 Account type
               </label>
-              <select
-                id="newRole"
-                className="input"
-                value={form.role}
-                onChange={(e) => set('role', e.target.value)}
-              >
-                {ROLES.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
+              {/* New accounts are always Meat Inspectors. Administrator
+                  accounts are created by the system owner, not from here. */}
+              <input id="newRole" className="input" value={ROLE_LABEL.inspector} readOnly disabled />
+              <p className="text-xs text-ink-faint mt-1">
+                Administrators can only create Meat Inspector accounts.
+              </p>
             </div>
 
             <div>
@@ -563,12 +556,6 @@ function CreateAccountModal({ open, onClose, onCreated }) {
           <Field label="Email address" value={form.email.trim()} />
         </dl>
 
-        {form.role === 'administrator' && (
-          <div className="alert-notice mt-5">
-            This account will be able to create and deactivate other accounts,
-            including administrators.
-          </div>
-        )}
 
         <p className="text-xs text-ink-faint mt-5">
           The User ID cannot be changed afterwards. Accounts are never deleted —

@@ -41,9 +41,14 @@ export function RequireAuth({ children }) {
 
 export function RequireRole({ roles, children }) {
   const auth = useAuth();
+  const location = useLocation();
 
   if (stillResolving(auth)) return <FullPageLoading />;
-  if (!auth.session || !auth.account) return <Navigate to="/login" replace />;
+  // Remember where the user was going (for example a notification email
+  // link) so sign-in can send them back there.
+  if (!auth.session || !auth.account) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
 
   if (!roles.includes(auth.account.role)) {
     return <Navigate to={landingPathFor(auth.account.role)} replace />;
@@ -56,10 +61,28 @@ export function RequireRole({ roles, children }) {
 // so the login form is exactly where they belong.
 export function RedirectIfAuthenticated({ children }) {
   const auth = useAuth();
+  const location = useLocation();
 
   if (stillResolving(auth)) return <FullPageLoading />;
-  if (auth.account) return <Navigate to={landingPathFor(auth.account.role)} replace />;
+  if (auth.account) {
+    const back = safeReturnPath(location.state?.from);
+    return <Navigate to={back ?? landingPathFor(auth.account.role)} replace />;
+  }
   return children;
+}
+
+// Only same-site app paths are followed. Anything else (another site,
+// "//evil.example", or a public page) falls back to the role landing page.
+// The role guard on the destination still decides whether the user may
+// see it.
+const PUBLIC_PATHS = ['/login', '/recover', '/reset-password', '/email-changed'];
+
+export function safeReturnPath(from) {
+  const pathname = from?.pathname;
+  if (typeof pathname !== 'string') return null;
+  if (!pathname.startsWith('/') || pathname.startsWith('//') || pathname.includes('\\')) return null;
+  if (pathname === '/' || PUBLIC_PATHS.includes(pathname)) return null;
+  return `${pathname}${from.search ?? ''}${from.hash ?? ''}`;
 }
 
 // Administrators land on account management and can navigate to inspections.

@@ -73,7 +73,7 @@ function NotificationHistory({ admin }) {
           <div className="flex flex-wrap gap-2 items-start justify-between"><h2 className="flex gap-2 items-center">{!admin && !item.read_at && <span className="h-2 w-2 rounded-full bg-brand-600" aria-label="Unread" />}{item.title}</h2><time className="text-xs text-ink-muted">{formatActivityTime(item.created_at)}</time></div>
           {admin && <p className="text-xs text-ink-muted mt-1">To {item.recipient_name} ({item.recipient_user_id}){item.sent_to ? ` · ${item.sent_to}` : ''}</p>}
           <p className="text-sm mt-3">{item.message}</p>
-          <p className="text-xs font-mono text-ink-muted mt-2 break-all">{item.inspection_id ?? `Mobile report: ${item.scan_id}`}</p>
+          <p className="text-xs font-mono text-ink-muted mt-2 break-all">{item.msafe_report_id ? `MSafe report: ${item.msafe_report_id}` : item.inspection_id ?? `Mobile report: ${item.scan_id}`}</p>
           <div className="flex flex-wrap gap-3 items-center mt-3">
             <span className={`text-xs rounded-md px-2 py-1 ${['failed','unknown'].includes(item.status) ? 'bg-state-reviewBg text-state-review' : 'bg-surface-sunken text-ink-muted'}`}>{DELIVERY_LABELS[item.status]}</span>
             <Link className="text-sm text-brand-700 underline" to={item.inspection_id ? `/records/${encodeURIComponent(item.inspection_id)}` : '/msafe-reports'}>Open {item.inspection_id ? 'inspection' : 'reports'}</Link>

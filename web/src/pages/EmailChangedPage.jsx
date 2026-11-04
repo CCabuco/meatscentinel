@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import PublicLayout from '../components/PublicLayout.jsx';
 
 // Where the email-change confirmation link lands.
 //
@@ -40,8 +41,8 @@ export default function EmailChangedPage() {
   }, []);
 
   return (
-    <div className="min-h-screen grid place-items-center px-6 py-12 bg-surface-sunken">
-      <div className="w-full max-w-sm card p-6 text-center">
+    <PublicLayout title="Email change">
+      <div className="card p-6 text-center">
         {phase === 'checking' && (
           <p className="text-sm text-ink-faint">Confirming…</p>
         )}
@@ -107,6 +108,6 @@ export default function EmailChangedPage() {
           </>
         )}
       </div>
-    </div>
+    </PublicLayout>
   );
 }

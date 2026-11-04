@@ -28,7 +28,7 @@ export async function saveNotificationOptions(global, options) {
 }
 export async function listNotifications(filters, page) {
   let query = supabase.from('inspection_notifications').select(
-    'id,recipient_id,recipient_user_id,recipient_name,scan_id,inspection_id,category,event_type,title,message,created_at,read_at,status,reason,attempts,accepted_at,sent_to',
+    'id,recipient_id,recipient_user_id,recipient_name,scan_id,msafe_report_id,inspection_id,category,event_type,title,message,created_at,read_at,status,reason,attempts,accepted_at,sent_to',
     { count: 'exact' },
   );
   if (filters.status) query = query.eq('status', filters.status);

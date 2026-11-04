@@ -2,11 +2,25 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import { getDashboardCounts } from '../lib/records.js';
+import { getMsafeCounts } from '../lib/msafe.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function DashboardPage() {
   const [counts, setCounts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { account } = useAuth();
+  const admin = account?.role === 'administrator';
+  const [msafe, setMsafe] = useState(null);
+  const [msafeError, setMsafeError] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    getMsafeCounts({ accountId: account.id, admin })
+      .then((result) => { if (active) setMsafe(result); })
+      .catch((err) => { if (active) setMsafeError(err.message); });
+    return () => { active = false; };
+  }, [account.id, admin]);
 
   useEffect(() => {
     let active = true;
@@ -46,6 +60,27 @@ export default function DashboardPage() {
         <CountCard label="Spoiled" value={counts?.spoiled} loading={loading} tone="spoiled" />
         <CountCard label="For review" value={counts?.forReview} loading={loading} tone="review" />
       </div>
+
+      <section className="card p-5 mb-6">
+        <h2 className="mb-1">MSafe reports</h2>
+        <p className="text-sm text-ink-muted mb-4">Reports from MSafe users and suppliers that need someone.</p>
+        {msafeError ? <p className="alert-error">{msafeError}</p> : (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <MsafeCounter
+              label="Unassigned"
+              hint="No inspector yet. Claim or assign one."
+              value={msafe?.unassigned}
+              to="/msafe-reports?view=unassigned"
+            />
+            <MsafeCounter
+              label={admin ? 'Assigned, not yet answered' : 'Assigned to me, not yet answered'}
+              hint="Nothing has been sent to the reporter yet."
+              value={msafe?.waiting}
+              to={admin ? '/msafe-reports?view=assigned&status=new' : '/msafe-reports?view=mine&status=new'}
+            />
+          </div>
+        )}
+      </section>
 
       {/*
         V-06 — these are all-time totals, not today's activity.
@@ -96,5 +131,17 @@ function CountCard({ label, value, loading, tone }) {
         {loading ? '—' : value}
       </p>
     </div>
+  );
+}
+
+function MsafeCounter({ label, hint, value, to }) {
+  return (
+    <Link to={to} className="flex items-center justify-between gap-4 rounded-lg border border-surface-line bg-surface-sunken px-4 py-3 hover:border-brand-500">
+      <div>
+        <p className="text-sm text-ink">{label}</p>
+        <p className="text-xs text-ink-faint mt-0.5">{hint}</p>
+      </div>
+      <span className="text-2xl font-medium tabular-nums text-brand-700">{value ?? '—'}</span>
+    </Link>
   );
 }

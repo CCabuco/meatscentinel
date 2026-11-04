@@ -1,12 +1,28 @@
+import { Link } from 'react-router-dom';
+import PublicLayout from '../components/PublicLayout.jsx';
+import { landingPathFor } from '../components/RouteGuard.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+
 export function NotFoundPage() {
+  const { account } = useAuth();
+
   return (
-    <div className="min-h-screen grid place-items-center bg-surface-sunken px-6">
-      <div className="text-center">
-        <h1 className="mb-1">Page not found</h1>
-        <p className="text-sm text-ink-muted">
-          That page does not exist in the inspection portal.
-        </p>
+    <PublicLayout title="Page not found">
+      <h1 className="mb-1">Page not found</h1>
+      <p className="text-sm text-ink-muted mb-6">
+        That page does not exist in the inspection portal.
+      </p>
+      <div className="card p-6">
+        {account ? (
+          <Link to={landingPathFor(account.role)} className="btn-primary w-full">
+            Go to {account.role === 'administrator' ? 'accounts' : 'dashboard'}
+          </Link>
+        ) : (
+          <Link to="/login" className="btn-primary w-full">
+            Go to sign in
+          </Link>
+        )}
       </div>
-    </div>
+    </PublicLayout>
   );
 }

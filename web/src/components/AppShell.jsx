@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { usePageTitle } from './PublicLayout.jsx';
 
 const INSPECTOR_LINKS = [
   { to: '/msafe-reports', label: 'MSafe reports' },
@@ -91,6 +92,7 @@ export default function AppShell({ children }) {
 }
 
 export function PageHeader({ title, description, actions }) {
+  usePageTitle(typeof title === 'string' ? title : undefined);
   return (
     <div className="flex items-start justify-between gap-4 mb-6">
       <div>

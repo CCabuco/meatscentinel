@@ -26,17 +26,33 @@ function fail(error) {
   throw new Error(error.message);
 }
 
-export async function listMsafeReports({ type = 'all', view = 'all', accountId, page = 0 } = {}) {
+// status: 'all', 'new' (nothing sent yet), or one of MSAFE_STATUSES ids
+// (the status of the latest sent response).
+export async function listMsafeReports({ type = 'all', view = 'all', status = 'all', accountId, page = 0 } = {}) {
   let query = supabase.from('msafe_reports_view').select('*', { count: 'exact' });
   if (type !== 'all') query = query.eq('report_type', type);
   if (view === 'unassigned') query = query.is('inspector_id', null);
   if (view === 'mine') query = query.eq('inspector_id', accountId);
+  if (view === 'assigned') query = query.not('inspector_id', 'is', null);
+  if (status === 'new') query = query.is('latest_status', null);
+  else if (status !== 'all') query = query.eq('latest_status', status);
   const { data, error, count } = await query
     .order('received_at', { ascending: false })
     .order('msafe_report_id', { ascending: false })
     .range(page * MSAFE_PAGE_SIZE, (page + 1) * MSAFE_PAGE_SIZE - 1);
   fail(error);
   return { rows: data ?? [], total: count ?? 0 };
+}
+
+// Dashboard counters. "Waiting for a response" means nothing has been sent
+// to the reporter yet; for an inspector it is limited to their own reports.
+export async function getMsafeCounts({ accountId, admin }) {
+  const head = () => supabase.from('msafe_reports_view').select('msafe_report_id', { count: 'exact', head: true });
+  let waiting = head().is('latest_status', null).not('inspector_id', 'is', null);
+  if (!admin) waiting = waiting.eq('inspector_id', accountId);
+  const [unassigned, open] = await Promise.all([head().is('inspector_id', null), waiting]);
+  fail(unassigned.error || open.error);
+  return { unassigned: unassigned.count ?? 0, waiting: open.count ?? 0 };
 }
 
 export async function getMsafeReport(reportId) {

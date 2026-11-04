@@ -82,14 +82,41 @@ function applyFilters(query, filters) {
   return q;
 }
 
+// Who is assigned to each record. MSafe reports (migration 017) are the
+// current source: a record linked to an MSafe report takes that report's
+// assigned inspector. The retired CheckMeat assignments are still read so
+// older records keep their inspector.
 async function withAssignments(records) {
   if (!records.length) return records;
-  const { data, error } = await supabase.from('customer_report_assignments')
-    .select('inspection_id,scan_id,inspector_id,inspector_name,inspector_user_id')
-    .in('inspection_id', records.map((record) => record.inspection_id));
-  if (error) throw new Error(error.message);
-  const assignments = new Map((data ?? []).map((row) => [row.inspection_id, row]));
-  return records.map((record) => ({ ...record, assignment: assignments.get(record.inspection_id) ?? null }));
+  const ids = records.map((record) => record.inspection_id);
+  const [legacy, msafe] = await Promise.all([
+    supabase.from('customer_report_assignments')
+      .select('inspection_id,scan_id,inspector_id,inspector_name,inspector_user_id')
+      .in('inspection_id', ids),
+    supabase.from('msafe_reports_view')
+      .select('msafe_report_id,inspection_id,inspector_id,inspector_name,report_type,latest_status,received_at')
+      .in('inspection_id', ids)
+      .order('received_at', { ascending: false }),
+  ]);
+  if (legacy.error) throw new Error(legacy.error.message);
+  if (msafe.error) throw new Error(msafe.error.message);
+
+  const legacyById = new Map((legacy.data ?? []).map((row) => [row.inspection_id, row]));
+  const msafeById = new Map();
+  for (const row of msafe.data ?? []) {
+    if (!msafeById.has(row.inspection_id)) msafeById.set(row.inspection_id, []);
+    msafeById.get(row.inspection_id).push(row);
+  }
+
+  return records.map((record) => {
+    const reports = msafeById.get(record.inspection_id) ?? [];
+    const assignedReport = reports.find((r) => r.inspector_id);
+    const assignment = assignedReport
+      ? { source: 'msafe', inspector_id: assignedReport.inspector_id, inspector_name: assignedReport.inspector_name,
+          msafe_report_id: assignedReport.msafe_report_id }
+      : legacyById.get(record.inspection_id) ?? null;
+    return { ...record, assignment, msafeReports: reports };
+  });
 }
 
 export async function listRecords({ tab = 'all', filters = {}, page = 0 }) {

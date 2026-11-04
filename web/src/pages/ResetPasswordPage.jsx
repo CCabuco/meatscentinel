@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import PublicLayout from '../components/PublicLayout.jsx';
 import { supabase } from '../lib/supabase.js';
 import PasswordInput from '../components/PasswordInput.jsx';
 import PasswordStrength from '../components/PasswordStrength.jsx';
@@ -81,8 +82,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-6 py-12 bg-surface-sunken">
-      <div className="w-full max-w-sm">
+    <PublicLayout title="Set new password">
         <h1 className="mb-1">Set a new password</h1>
         <p className="text-sm text-ink-muted mb-6">
           Choose a password that meets the requirements below.
@@ -157,7 +157,6 @@ export default function ResetPasswordPage() {
             </button>
           </form>
         )}
-      </div>
-    </div>
+    </PublicLayout>
   );
 }

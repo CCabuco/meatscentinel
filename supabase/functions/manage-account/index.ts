@@ -208,8 +208,11 @@ Deno.serve(async (req) => {
     if (!user_id || !email || !display_name || !role) {
       return json({ error: 'All fields are required.' }, 400);
     }
-    if (role !== 'inspector' && role !== 'administrator') {
-      return json({ error: 'Role must be inspector or administrator.' }, 400);
+    // Administrators may only create Meat Inspector accounts. New
+    // administrator accounts are made by the system owner in the
+    // Supabase dashboard, not through the portal.
+    if (role !== 'inspector') {
+      return json({ error: 'Administrators can only create Meat Inspector accounts.' }, 403);
     }
 
     const pwError = passwordFails(password);
