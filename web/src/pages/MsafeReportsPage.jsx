@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import useAutoRefresh from '../lib/useAutoRefresh.js';
 import { Link, useSearchParams } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -63,12 +64,19 @@ export default function MsafeReportsPage() {
 
   useEffect(() => { setPage(0); }, [type, view, status]);
 
+  // Auto refresh reloads the list quietly (no loading state, and a failed
+  // refresh keeps the current list).
+  const quiet = useRef(false);
+  useAutoRefresh(() => { quiet.current = true; setRevision((r) => r + 1); });
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true); setError('');
+    const silent = quiet.current;
+    quiet.current = false;
+    if (!silent) { setLoading(true); setError(''); }
     listMsafeReports({ type, view, status, accountId: account.id, page })
-      .then((r) => { if (!cancelled) { setRows(r.rows); setTotal(r.total); } })
-      .catch((err) => { if (!cancelled) setError(err.message); })
+      .then((r) => { if (!cancelled) { setRows(r.rows); setTotal(r.total); setError(''); } })
+      .catch((err) => { if (!cancelled && !silent) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [type, view, status, page, account.id, revision]);

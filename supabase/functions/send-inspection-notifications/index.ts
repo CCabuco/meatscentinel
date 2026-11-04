@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       };
       // Recheck settings and current email after leasing, including opt-outs while queued.
       const [eligibility, account, settings] = await Promise.all([
-        db.rpc('notification_skip_reason', { p_recipient: item.recipient_id, p_category: item.category, p_scan: item.scan_id ?? item.msafe_report_id, p_event: item.event_type }),
+        db.rpc('notification_skip_reason', { p_recipient: item.recipient_id, p_category: item.category, p_scan: item.scan_id ?? item.msafe_report_id, p_event: item.event_type, p_inspection: item.inspection_id ?? null }),
         db.from('accounts').select('email').eq('id', item.recipient_id).single(),
         db.from('notification_settings').select('email_enabled').eq('id', true).single(),
       ]);

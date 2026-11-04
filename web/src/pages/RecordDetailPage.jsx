@@ -8,7 +8,11 @@ import { reportInspectionView } from '../lib/activity.js';
 import { ClassificationBadge } from '../components/Badge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime, formatPpm, titleCaseSample } from '../lib/format.js';
+import useAutoRefresh from '../lib/useAutoRefresh.js';
+import { listActiveInspectors } from '../lib/msafe.js';
 import {
+  assignInspection,
+  pairingLabel,
   getRecord,
   getTimeline,
   addRemark,
@@ -59,13 +63,21 @@ export default function RecordDetailPage() {
   const [remarkOpen, setRemarkOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
 
-  const load = useCallback(async () => {
+  // silent: refresh in place (auto refresh, after an action) without the
+  // full-page loading screen. The photo link is only fetched again when
+  // the photo changes.
+  const imagePath = useRef(null);
+  const load = useCallback(async ({ silent = false } = {}) => {
     const sequence = ++loadSequence.current;
-    setLoading(true);
-    setImageUrl(null);
+    if (!silent) {
+      setLoading(true);
+      setImageUrl(null);
+      imagePath.current = null;
+    }
     const { record: row, error: recordError } = await getRecord(inspectionId);
     if (sequence !== loadSequence.current) return;
 
+    if (silent && (recordError || !row)) return; // keep what is shown; retry next time
     if (recordError || !row) {
       setError(recordError ?? 'That inspection record was not found.');
       setLoading(false);
@@ -79,7 +91,8 @@ export default function RecordDetailPage() {
     setError(null);
     setLoading(false);
 
-    if (row.image_path) {
+    if (row.image_path && row.image_path !== imagePath.current) {
+      imagePath.current = row.image_path;
       const url = await getImageUrl(row.image_path);
       if (sequence === loadSequence.current) setImageUrl(url);
     }
@@ -90,6 +103,10 @@ export default function RecordDetailPage() {
     load();
     return () => { loadSequence.current += 1; };
   }, [load]);
+
+  // A gas reading or mobile result arriving, the pairing, a new status or
+  // a reassignment shows up here without reloading the page.
+  useAutoRefresh(() => load({ silent: true }));
 
   useEffect(() => {
     if (!loading && !error && record?.inspection_id === inspectionId) reportView('record_viewed');
@@ -128,9 +145,9 @@ export default function RecordDetailPage() {
         <div className="flex flex-wrap items-center gap-3 mt-2">
           <h1 className="font-mono">{record.inspection_id}</h1>
           <ClassificationBadge value={record.final_classification} />
-          {record.pairing_state === 'pending' && (
-            <span className="text-xs text-ink-muted">Waiting for its counterpart</span>
-          )}
+          <span className={`text-xs ${record.pairing_state === 'paired' ? 'font-medium text-ink' : 'text-ink-muted'}`}>
+            {pairingLabel(record)}
+          </span>
         </div>
       </div>
 
@@ -157,6 +174,15 @@ export default function RecordDetailPage() {
         </div>
 
         <div className="space-y-6">
+          <AssignmentPanel
+            record={record}
+            admin={account.role === 'administrator'}
+            onAssigned={(message) => {
+              setFeedback({ tone: 'success', message });
+              load({ silent: true });
+            }}
+            onError={(message) => setFeedback({ tone: 'error', message })}
+          />
           <RemarksPanel
             currentRemark={currentRemark}
             entryCount={timeline.length}
@@ -186,7 +212,7 @@ export default function RecordDetailPage() {
         onCreated={(message) => {
           setRemarkOpen(false);
           setFeedback({ tone: 'success', message });
-          load();
+          load({ silent: true });
         }}
       />
 
@@ -199,7 +225,7 @@ export default function RecordDetailPage() {
         onChanged={(message) => {
           setStatusOpen(false);
           setFeedback({ tone: 'success', message });
-          load();
+          load({ silent: true });
         }}
       />
     </AppShell>
@@ -268,6 +294,87 @@ function InputCard({ label, present, valid, value, missingText, invalidText }) {
   );
 }
 
+// Who is responsible for this inspection. Administrators can assign,
+// reassign or unassign; the inspector is emailed when it changes.
+function AssignmentPanel({ record, admin, onAssigned, onError }) {
+  const [inspectors, setInspectors] = useState(null);
+  const [choice, setChoice] = useState('');
+  const [busy, setBusy] = useState(false);
+  const assignment = record.assignment;
+  const direct = assignment?.source === 'direct';
+
+  useEffect(() => {
+    if (!admin) return;
+    let active = true;
+    listActiveInspectors()
+      .then((rows) => { if (active) setInspectors(rows); })
+      .catch((err) => { if (active) onError(err.message); });
+    return () => { active = false; };
+  // onError is a fresh function each render; load the list once.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admin]);
+
+  useEffect(() => {
+    setChoice(direct ? assignment.inspector_id : '');
+  }, [direct, assignment?.inspector_id]);
+
+  async function save(inspectorId) {
+    setBusy(true);
+    const { error } = await assignInspection(record.inspection_id, inspectorId);
+    setBusy(false);
+    if (error) { onError(error); return; }
+    const name = inspectors?.find((i) => i.id === inspectorId)?.display_name;
+    onAssigned(inspectorId
+      ? `${name ?? 'The inspector'} is now assigned and will be emailed.`
+      : 'The inspector was unassigned and will be emailed.');
+  }
+
+  return (
+    <section className="card p-5">
+      <h2 className="mb-1">Assigned inspector</h2>
+      <p className="text-sm text-ink mb-1">{assignment?.inspector_name ?? 'Unassigned'}</p>
+      <p className="text-xs text-ink-faint mb-4">
+        {direct
+          ? `Assigned by ${assignment.assigned_by_name ?? 'an administrator'} · ${formatDateTime(assignment.assigned_at)}`
+          : assignment?.source === 'msafe'
+            ? 'Through the linked MSafe report.'
+            : assignment ? 'Through a linked mobile report (CheckMeat, retired).' : 'No inspector is responsible for this record yet.'}
+      </p>
+      {admin && (
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (choice) save(choice); }}>
+          <div>
+            <label className="label" htmlFor="assign-inspector">
+              {direct ? 'Reassign to' : 'Assign to'}
+            </label>
+            <select id="assign-inspector" className="input" value={choice} disabled={busy || !inspectors}
+              onChange={(e) => setChoice(e.target.value)}>
+              <option value="">{inspectors ? 'Choose an inspector' : 'Loading inspectors…'}</option>
+              {(inspectors ?? []).map((i) => (
+                <option key={i.id} value={i.id}>{i.display_name} ({i.user_id})</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" className="btn-primary"
+              disabled={busy || !choice || (direct && choice === assignment.inspector_id)}>
+              {busy ? 'Saving…' : direct ? 'Reassign' : 'Assign'}
+            </button>
+            {direct && (
+              <button type="button" className="btn-secondary" disabled={busy} onClick={() => save(null)}>
+                Unassign
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-ink-faint">
+            The inspector gets an email now, and later when gas or mobile results arrive,
+            the record is paired, or its status changes.
+          </p>
+        </form>
+      )}
+    </section>
+  );
+}
+
 function DetailPanel({ record, currentStatus }) {
   return (
     <section className="card p-5">
@@ -298,6 +405,7 @@ function DetailPanel({ record, currentStatus }) {
           label="Source type"
           value={sourceLabel(record.has_gas_submission, record.has_image_submission)}
         />
+        <Detail label="Pairing" value={pairingLabel(record)} />
         <Detail label="Recorded" value={formatDateTime(record.created_at)} />
         <Detail label="Final averaged NH₃" value={formatPpm(record.nh3_ppm)} />
         <Detail label="Final averaged H₂S" value={formatPpm(record.h2s_ppm)} />

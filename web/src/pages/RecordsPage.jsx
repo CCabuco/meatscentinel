@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import { ClassificationBadge, StatusPill, SourceMarks } from '../components/Badge.jsx';
+import useAutoRefresh from '../lib/useAutoRefresh.js';
 import { formatDateTime, formatPpm, titleCaseSample } from '../lib/format.js';
 import {
   listRecords,
@@ -18,35 +20,62 @@ const EMPTY_FILTERS = {
   sourceType: '',
   classification: '',
   caseStatus: '',
+  assigned: '',
   dateFrom: '',
   dateTo: '',
 };
 
+// Links such as /records?classification=For+Review or /records?assigned=mine
+// (from the Dashboard) open the list already filtered.
+function filtersFromUrl(params) {
+  const filters = { ...EMPTY_FILTERS };
+  for (const key of Object.keys(EMPTY_FILTERS)) {
+    const value = params.get(key);
+    if (value) filters[key] = value;
+  }
+  return filters;
+}
+
 export default function RecordsPage() {
-  const [tab, setTab] = useState('all');
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [searchParams] = useSearchParams();
+  const { account } = useAuth();
+  const [tab, setTab] = useState(() => {
+    const t = searchParams.get('tab');
+    return TABS.some((x) => x.id === t) ? t : 'all';
+  });
+  const [filters, setFilters] = useState(() => filtersFromUrl(searchParams));
   const [page, setPage] = useState(0);
   const [records, setRecords] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // silent: refresh in place (auto refresh) without the loading state.
+  const sequence = useRef(0);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    const mine = ++sequence.current;
+    if (!silent) setLoading(true);
     const { records: rows, total: count, error: loadError } = await listRecords({
       tab,
       filters,
       page,
+      accountId: account.id,
     });
+    if (mine !== sequence.current) return; // a newer load replaced this one
+    if (silent && loadError) return; // keep what is on screen; the next refresh retries
     setRecords(rows);
     setTotal(count);
     setError(loadError);
     setLoading(false);
-  }, [tab, filters, page]);
+  }, [tab, filters, page, account.id]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // New gas readings, mobile results, pairings, status changes and
+  // assignments appear without reloading the page.
+  useAutoRefresh(() => load({ silent: true }));
 
   function updateFilter(key, value) {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -178,6 +207,15 @@ function Filters({ filters, onChange, onClear, activeCount }) {
           value={filters.caseStatus}
           onChange={(v) => onChange('caseStatus', v)}
           options={CASE_STATUSES.map((s) => ({ value: s, label: s }))}
+        />
+        <Select
+          label="Assigned inspector"
+          value={filters.assigned}
+          onChange={(v) => onChange('assigned', v)}
+          options={[
+            { value: 'mine', label: 'Assigned to me' },
+            { value: 'unassigned', label: 'Unassigned' },
+          ]}
         />
         <div>
           <label className="label" htmlFor="dateFrom">From date</label>

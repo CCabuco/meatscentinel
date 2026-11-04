@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
-import { getDashboardCounts } from '../lib/records.js';
+import { getDashboardCounts, getMyInspectionCount } from '../lib/records.js';
+import useAutoRefresh from '../lib/useAutoRefresh.js';
 import { getMsafeCounts } from '../lib/msafe.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -14,26 +15,33 @@ export default function DashboardPage() {
   const [msafe, setMsafe] = useState(null);
   const [msafeError, setMsafeError] = useState(null);
 
-  useEffect(() => {
-    let active = true;
-    getMsafeCounts({ accountId: account.id, admin })
-      .then((result) => { if (active) setMsafe(result); })
-      .catch((err) => { if (active) setMsafeError(err.message); });
-    return () => { active = false; };
+  const [mine, setMine] = useState(null);
+
+  // Loads every counter. Runs on open and then automatically, so new
+  // gas readings, mobile results and pairings show up without a reload.
+  const load = useCallback(async (isActive = () => true) => {
+    const [result, msafeResult, mineResult] = await Promise.all([
+      getDashboardCounts(),
+      getMsafeCounts({ accountId: account.id, admin }).then((r) => ({ r }), (err) => ({ err })),
+      admin ? Promise.resolve(null) : getMyInspectionCount(account.id),
+    ]);
+    if (!isActive()) return;
+    // A failed refresh keeps the last good numbers on screen.
+    setCounts((prev) => result.counts ?? prev);
+    setError(result.error);
+    if (msafeResult.r) { setMsafe(msafeResult.r); setMsafeError(null); }
+    else setMsafeError(msafeResult.err.message);
+    if (mineResult && mineResult.count !== null) setMine(mineResult.count);
+    setLoading(false);
   }, [account.id, admin]);
 
   useEffect(() => {
     let active = true;
-    getDashboardCounts().then((result) => {
-      if (!active) return;
-      setCounts(result.counts);
-      setError(result.error);
-      setLoading(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+    load(() => active);
+    return () => { active = false; };
+  }, [load]);
+
+  useAutoRefresh(() => load());
 
   return (
     <AppShell>
@@ -60,6 +68,19 @@ export default function DashboardPage() {
         <CountCard label="Spoiled" value={counts?.spoiled} loading={loading} tone="spoiled" />
         <CountCard label="For review" value={counts?.forReview} loading={loading} tone="review" />
       </div>
+
+      {!admin && (
+        <section className="card p-5 mb-6">
+          <h2 className="mb-1">My inspections</h2>
+          <p className="text-sm text-ink-muted mb-4">Inspection records an administrator assigned to you, or linked to your MSafe reports.</p>
+          <MsafeCounter
+            label="Assigned to me"
+            hint="Open the list to see gas readings, mobile results and case status."
+            value={mine}
+            to="/records?assigned=mine"
+          />
+        </section>
+      )}
 
       <section className="card p-5 mb-6">
         <h2 className="mb-1">MSafe reports</h2>

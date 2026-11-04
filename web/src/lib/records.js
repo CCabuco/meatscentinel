@@ -82,14 +82,17 @@ function applyFilters(query, filters) {
   return q;
 }
 
-// Who is assigned to each record. MSafe reports (migration 017) are the
-// current source: a record linked to an MSafe report takes that report's
-// assigned inspector. The retired CheckMeat assignments are still read so
-// older records keep their inspector.
+// Who is assigned to each record, in this order:
+//   1. An inspector an administrator assigned to the record (migration 020).
+//   2. The inspector of a linked MSafe report (migration 017).
+//   3. The retired CheckMeat assignment, so older records keep their inspector.
 async function withAssignments(records) {
   if (!records.length) return records;
   const ids = records.map((record) => record.inspection_id);
-  const [legacy, msafe] = await Promise.all([
+  const [direct, legacy, msafe] = await Promise.all([
+    supabase.from('inspection_assignments_view')
+      .select('inspection_id,inspector_id,inspector_name,assigned_by_name,assigned_at')
+      .in('inspection_id', ids),
     supabase.from('customer_report_assignments')
       .select('inspection_id,scan_id,inspector_id,inspector_name,inspector_user_id')
       .in('inspection_id', ids),
@@ -98,9 +101,11 @@ async function withAssignments(records) {
       .in('inspection_id', ids)
       .order('received_at', { ascending: false }),
   ]);
+  if (direct.error) throw new Error(direct.error.message);
   if (legacy.error) throw new Error(legacy.error.message);
   if (msafe.error) throw new Error(msafe.error.message);
 
+  const directById = new Map((direct.data ?? []).map((row) => [row.inspection_id, { source: 'direct', ...row }]));
   const legacyById = new Map((legacy.data ?? []).map((row) => [row.inspection_id, row]));
   const msafeById = new Map();
   for (const row of msafe.data ?? []) {
@@ -111,21 +116,78 @@ async function withAssignments(records) {
   return records.map((record) => {
     const reports = msafeById.get(record.inspection_id) ?? [];
     const assignedReport = reports.find((r) => r.inspector_id);
-    const assignment = assignedReport
+    const assignment = directById.get(record.inspection_id) ?? (assignedReport
       ? { source: 'msafe', inspector_id: assignedReport.inspector_id, inspector_name: assignedReport.inspector_name,
           msafe_report_id: assignedReport.msafe_report_id }
-      : legacyById.get(record.inspection_id) ?? null;
+      : legacyById.get(record.inspection_id) ?? null);
     return { ...record, assignment, msafeReports: reports };
   });
 }
 
-export async function listRecords({ tab = 'all', filters = {}, page = 0 }) {
+// Plain-language pairing state, the same on every page. pairing_state comes
+// from the database view, so it always matches the stored submissions.
+export function pairingLabel(record) {
+  if (record.has_gas_submission && record.has_image_submission) return 'Paired';
+  if (record.has_gas_submission) return 'Waiting for mobile result';
+  if (record.has_image_submission) return 'Waiting for gas reading';
+  return 'No submissions yet';
+}
+
+// Administrators only (enforced in the database). Pass null to unassign.
+export async function assignInspection(inspectionId, inspectorId) {
+  const { error } = await supabase.rpc('assign_inspection', {
+    p_inspection_id: inspectionId,
+    p_inspector_id: inspectorId || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+// Inspection IDs that have an inspector: assigned directly by an
+// administrator, or through a linked MSafe report. With accountId, only
+// that inspector's.
+async function assignedInspectionIds(accountId) {
+  let direct = supabase.from('inspection_assignments').select('inspection_id');
+  let msafe = supabase.from('msafe_report_assignments').select('inspection_id')
+    .not('inspection_id', 'is', null).not('inspector_id', 'is', null);
+  if (accountId) {
+    direct = direct.eq('inspector_id', accountId);
+    msafe = msafe.eq('inspector_id', accountId);
+  }
+  const [d, m] = await Promise.all([direct, msafe]);
+  if (d.error) throw new Error(d.error.message);
+  if (m.error) throw new Error(m.error.message);
+  return [...new Set([...(d.data ?? []), ...(m.data ?? [])].map((r) => r.inspection_id))];
+}
+
+// PostgREST "in" list, with IDs quoted (they may contain hyphens).
+const inList = (ids) => `(${ids.map((id) => `"${id}"`).join(',')})`;
+
+export async function getMyInspectionCount(accountId) {
+  try {
+    return { count: (await assignedInspectionIds(accountId)).length, error: null };
+  } catch (err) { return { count: null, error: err.message }; }
+}
+
+export async function listRecords({ tab = 'all', filters = {}, page = 0, accountId = null }) {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
   let query = supabase
     .from('inspection_records_view')
     .select('*', { count: 'exact' });
+
+  if (filters.assigned === 'mine' || filters.assigned === 'unassigned') {
+    let ids;
+    try {
+      ids = await assignedInspectionIds(filters.assigned === 'mine' ? accountId : null);
+    } catch (err) { return { records: [], total: 0, error: err.message }; }
+    if (filters.assigned === 'mine') {
+      if (!ids.length) return { records: [], total: 0, error: null };
+      query = query.in('inspection_id', ids);
+    } else if (ids.length) {
+      query = query.not('inspection_id', 'in', inList(ids));
+    }
+  }
 
   query = applyTab(query, tab);
   query = applyFilters(query, filters);

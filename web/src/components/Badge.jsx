@@ -36,12 +36,22 @@ export function StatusPill({ value }) {
   );
 }
 
+// Which halves have arrived, plus the pairing state in words, so the
+// state does not depend on telling grey text from black.
 export function SourceMarks({ hasGas, hasImage }) {
+  const paired = hasGas && hasImage;
+  const state = paired ? 'Paired'
+    : hasGas ? 'Waiting for mobile'
+    : hasImage ? 'Waiting for gas'
+    : 'No submissions';
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs">
-      <span className={hasGas ? 'text-ink' : 'text-ink-faint/60'}>Gas</span>
-      <span className="text-ink-faint/40" aria-hidden="true">+</span>
-      <span className={hasImage ? 'text-ink' : 'text-ink-faint/60'}>Image</span>
+    <span className="inline-flex flex-col gap-0.5 text-xs">
+      <span className="inline-flex items-center gap-1.5">
+        <span className={hasGas ? 'text-ink' : 'text-ink-faint/60'}>Gas{hasGas ? ' ✓' : ''}</span>
+        <span className="text-ink-faint/40" aria-hidden="true">+</span>
+        <span className={hasImage ? 'text-ink' : 'text-ink-faint/60'}>Image{hasImage ? ' ✓' : ''}</span>
+      </span>
+      <span className={paired ? 'font-medium text-ink' : 'text-ink-muted'}>{state}</span>
     </span>
   );
 }
