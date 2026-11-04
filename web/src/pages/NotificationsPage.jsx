@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
+import FilterBar, { FilterSelect } from '../components/FilterBar.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import { formatActivityTime } from '../lib/activity.js';
@@ -28,7 +29,6 @@ export default function NotificationsPage() {
 
 function NotificationHistory({ admin }) {
   const [filters, setFilters] = useState({ status: '', category: '', inspector: '', unread: false });
-  const [inspectorDraft, setInspectorDraft] = useState('');
   const [page, setPage] = useState(0);
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState({ rows: [], total: 0 });
@@ -37,6 +37,7 @@ function NotificationHistory({ admin }) {
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(null);
   const [uncertain, setUncertain] = useState(null);
+  const [openId, setOpenId] = useState(null);
   const filterKey = JSON.stringify(filters);
   useEffect(() => {
     let active = true;
@@ -54,37 +55,72 @@ function NotificationHistory({ admin }) {
     } catch (err) { setActionError(err.message); }
     finally { setBusy(null); }
   }
-  return <div className="space-y-4">
-    <div className="card p-4 flex flex-wrap gap-3 items-end">
-      <label className="text-xs text-ink-muted">Email status<select className="input mt-1" value={filters.status} onChange={(e) => filter('status', e.target.value)}>
-        <option value="">All statuses</option>{Object.entries(DELIVERY_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-      <label className="text-xs text-ink-muted">Category<select className="input mt-1" value={filters.category} onChange={(e) => filter('category', e.target.value)}>
-        <option value="">All categories</option>{Object.entries(NOTIFICATION_CATEGORIES).map(([id, [label]]) => <option key={id} value={id}>{label}</option>)}</select></label>
-      {admin ? <form className="flex gap-2 items-end" onSubmit={(e) => { e.preventDefault(); filter('inspector', inspectorDraft); }}>
-        <label className="text-xs text-ink-muted">Inspector ID<input className="input mt-1" placeholder="e.g. INSP-002" value={inspectorDraft} onChange={(e) => setInspectorDraft(e.target.value)} /></label><button className="btn-secondary">Filter</button>
-      </form> : <label className="flex items-center gap-2 text-sm pb-2"><input type="checkbox" checked={filters.unread} onChange={(e) => filter('unread', e.target.checked)} />Unread only</label>}
-      <button className="btn-secondary" disabled={loading} onClick={() => setRevision((v) => v + 1)}>Refresh</button>
+  const chips = [
+    filters.status && { key: 'status', label: DELIVERY_LABELS[filters.status] },
+    filters.category && { key: 'category', label: NOTIFICATION_CATEGORIES[filters.category]?.[0] },
+    filters.unread && { key: 'unread', label: 'Unread only', value: false },
+  ].filter(Boolean).map((chip) => ({ ...chip, onRemove: () => filter(chip.key, chip.value ?? '') }));
+  return <div className="space-y-3">
+    <div className="card overflow-hidden">
+      <FilterBar
+        search={admin ? filters.inspector : undefined}
+        onSearch={admin ? (text) => filter('inspector', text) : undefined}
+        searchPlaceholder="Inspector ID, e.g. INSP-002"
+        searchLabel="Inspector ID"
+        chips={chips}
+        onClearAll={() => { setFilters((f) => ({ ...f, status: '', category: '', unread: false })); setPage(0); }}
+        actions={<>
+          {!admin && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={filters.unread} onChange={(e) => filter('unread', e.target.checked)} />Unread only</label>}
+          <button className="btn-secondary" disabled={loading} onClick={() => setRevision((v) => v + 1)}>Refresh</button>
+        </>}
+      >
+        <FilterSelect label="Email status" value={filters.status} onChange={(v) => filter('status', v)} anyLabel="All statuses"
+          options={Object.entries(DELIVERY_LABELS).map(([value, label]) => ({ value, label }))} />
+        <FilterSelect label="Category" value={filters.category} onChange={(v) => filter('category', v)} anyLabel="All categories"
+          options={Object.entries(NOTIFICATION_CATEGORIES).map(([value, [label]]) => ({ value, label }))} />
+      </FilterBar>
+
+      {actionError && <p role="alert" className="alert-error m-4">{actionError}</p>}
+      {error ? <p role="alert" className="alert-error m-4">{error}</p> : loading ? <p role="status" className="p-6 text-sm text-ink-faint">Loading notifications…</p>
+        : data.rows.length === 0 ? <p className="p-8 text-center text-sm text-ink-muted">No notifications match this view.</p>
+        : <ol className="divide-y divide-surface-line">{data.rows.map((item) => {
+          const open = openId === item.id;
+          const warn = ['failed', 'unknown'].includes(item.status);
+          return <li key={item.id} className="px-4 py-2 text-sm">
+            <div className="flex flex-wrap sm:flex-nowrap items-baseline gap-x-3 gap-y-0.5">
+              <time className="text-xs text-ink-faint whitespace-nowrap tabular-nums sm:w-44 shrink-0">{formatActivityTime(item.created_at)}</time>
+              <button type="button" onClick={() => setOpenId(open ? null : item.id)} aria-expanded={open}
+                className={`text-left font-medium flex items-center gap-2 min-w-0 flex-1 ${!admin && !item.read_at ? 'text-ink' : 'text-ink'}`}>
+                {!admin && !item.read_at && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-600" aria-label="Unread" />}
+                <span className="truncate">{item.title}</span>
+              </button>
+              {admin && <span className="text-xs text-ink-muted whitespace-nowrap">{item.recipient_name} ({item.recipient_user_id})</span>}
+              <span className={`text-[11px] rounded px-1.5 py-0.5 whitespace-nowrap ${warn ? 'bg-state-reviewBg text-state-review' : 'bg-surface-sunken text-ink-muted'}`}>{DELIVERY_LABELS[item.status]}</span>
+              <Link className="text-xs text-brand-700 underline whitespace-nowrap"
+                to={item.inspection_id ? `/records/${encodeURIComponent(item.inspection_id)}` : item.msafe_report_id ? `/msafe-reports?report=${item.msafe_report_id}` : '/msafe-reports'}>
+                Open
+              </Link>
+            </div>
+            {open && <div className="mt-2 sm:ml-[12.75rem] space-y-2">
+              <p>{item.message}</p>
+              <p className="text-xs font-mono text-ink-muted break-all">
+                {item.msafe_report_id ? `MSafe report ${item.msafe_report_id}` : ''}{item.msafe_report_id && item.inspection_id ? ' · ' : ''}
+                {item.inspection_id ? `Inspection ${item.inspection_id}` : ''}{!item.msafe_report_id && !item.inspection_id && item.scan_id ? `Mobile report ${item.scan_id}` : ''}
+              </p>
+              {admin && item.sent_to && <p className="text-xs text-ink-muted">Sent to {item.sent_to}</p>}
+              {item.reason && <p className="text-xs text-ink-muted">{item.reason}</p>}
+              <div className="flex flex-wrap gap-2">
+                {!admin && !item.read_at && <button className="btn-secondary text-xs" disabled={busy !== null} onClick={() => action(item, false)}>Mark as read</button>}
+                {admin && item.status === 'failed' && <button className="btn-secondary text-xs" disabled={busy !== null} onClick={() => action(item, true)}>Retry email</button>}
+                {admin && item.status === 'unknown' && <button className="btn-secondary text-xs" disabled={busy !== null} onClick={() => setUncertain(item.id)}>Review retry</button>}
+              </div>
+              {uncertain === item.id && <div className="alert-notice text-sm"><p>This email may already have been sent. Check Brevo’s transactional log first. Retrying can create a duplicate.</p><div className="flex gap-2 mt-3"><button className="btn-secondary" disabled={busy !== null} onClick={() => action(item, true, true)}>Retry anyway</button><button className="btn-secondary" disabled={busy !== null} onClick={() => setUncertain(null)}>Cancel</button></div></div>}
+            </div>}
+          </li>;
+        })}</ol>}
     </div>
-    <p className="text-xs text-ink-muted">New events only. Emails are processed every minute. “Accepted” means the email provider accepted the request; it does not confirm Gmail inbox delivery.</p>
-    {actionError && <p role="alert" className="alert-error">{actionError}</p>}
-    {error ? <p role="alert" className="alert-error">{error}</p> : loading ? <p role="status">Loading notifications…</p>
-      : data.rows.length === 0 ? <div className="card p-8 text-center text-ink-muted">No notifications match this view.</div>
-        : <ol className="card divide-y divide-surface-line">{data.rows.map((item) => <li key={item.id} className="p-5">
-          <div className="flex flex-wrap gap-2 items-start justify-between"><h2 className="flex gap-2 items-center">{!admin && !item.read_at && <span className="h-2 w-2 rounded-full bg-brand-600" aria-label="Unread" />}{item.title}</h2><time className="text-xs text-ink-muted">{formatActivityTime(item.created_at)}</time></div>
-          {admin && <p className="text-xs text-ink-muted mt-1">To {item.recipient_name} ({item.recipient_user_id}){item.sent_to ? ` · ${item.sent_to}` : ''}</p>}
-          <p className="text-sm mt-3">{item.message}</p>
-          <p className="text-xs font-mono text-ink-muted mt-2 break-all">{item.msafe_report_id ? `MSafe report: ${item.msafe_report_id}` : item.inspection_id ?? `Mobile report: ${item.scan_id}`}</p>
-          <div className="flex flex-wrap gap-3 items-center mt-3">
-            <span className={`text-xs rounded-md px-2 py-1 ${['failed','unknown'].includes(item.status) ? 'bg-state-reviewBg text-state-review' : 'bg-surface-sunken text-ink-muted'}`}>{DELIVERY_LABELS[item.status]}</span>
-            <Link className="text-sm text-brand-700 underline" to={item.inspection_id ? `/records/${encodeURIComponent(item.inspection_id)}` : '/msafe-reports'}>Open {item.inspection_id ? 'inspection' : 'reports'}</Link>
-            {!admin && !item.read_at && <button className="btn-secondary" disabled={busy !== null} onClick={() => action(item, false)}>Mark as read</button>}
-            {admin && item.status === 'failed' && <button className="btn-secondary" disabled={busy !== null} onClick={() => action(item, true)}>Retry email</button>}
-            {admin && item.status === 'unknown' && <button className="btn-secondary" disabled={busy !== null} onClick={() => setUncertain(item.id)}>Review retry</button>}
-          </div>
-          {item.reason && <p className="text-xs text-ink-muted mt-2">{item.reason}</p>}
-          {uncertain === item.id && <div className="alert-notice mt-3 text-sm"><p>This email may already have been sent. Check Brevo’s transactional log first. Retrying can create a duplicate.</p><div className="flex gap-2 mt-3"><button className="btn-secondary" disabled={busy !== null} onClick={() => action(item, true, true)}>Retry anyway</button><button className="btn-secondary" disabled={busy !== null} onClick={() => setUncertain(null)}>Cancel</button></div></div>}
-        </li>)}</ol>}
-    <Pagination page={page} total={data.total} loading={loading} setPage={setPage} />
+    <p className="text-xs text-ink-faint">Select a notification to see the full message. Emails are sent within about a minute. “Accepted” means the email provider took the message; it does not confirm it reached the inbox.</p>
+    <Pagination page={page} total={data.total} loading={loading} setPage={setPage} noun={['notification', 'notifications']} />
   </div>;
 }
 
@@ -145,9 +181,16 @@ function ManagementHistory() {
         {row.details.after && <p className="text-xs mt-3">{Object.entries(row.details.after).map(([key, value]) => `${key === 'email_enabled' ? 'Email' : NOTIFICATION_CATEGORIES[key]?.[0] ?? key}: ${value ? 'On' : 'Off'}`).join(' · ')}</p>}
         {row.details.notification_id && <p className="text-xs mt-3 break-all">Notification {row.details.notification_id} · Previous status: {DELIVERY_LABELS[row.details.previous_status]}</p>}
       </li>)}</ol>}
-    <Pagination page={page} total={data.total} loading={loading} setPage={setPage} />
+    <Pagination page={page} total={data.total} loading={loading} setPage={setPage} noun={['change', 'changes']} pageSize={20} />
   </div>;
 }
-function Pagination({ page, total, loading, setPage }) {
-  return <div className="flex gap-3 items-center justify-between text-sm"><span>{total} notifications · Page {page + 1}</span><div className="flex gap-2"><button className="btn-secondary" disabled={loading || page === 0} onClick={() => setPage((p) => p - 1)}>Previous</button><button className="btn-secondary" disabled={loading || (page + 1) * NOTIFICATION_PAGE_SIZE >= total} onClick={() => setPage((p) => p + 1)}>Next</button></div></div>;
+function Pagination({ page, total, loading, setPage, noun, pageSize = NOTIFICATION_PAGE_SIZE }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  return <div className="flex gap-3 items-center justify-between text-sm">
+    <span className="text-ink-muted">{total} {total === 1 ? noun[0] : noun[1]} · Page {page + 1} of {pages}</span>
+    <div className="flex gap-2">
+      <button className="btn-secondary" disabled={loading || page === 0} onClick={() => setPage((p) => p - 1)}>Previous</button>
+      <button className="btn-secondary" disabled={loading || (page + 1) * pageSize >= total} onClick={() => setPage((p) => p + 1)}>Next</button>
+    </div>
+  </div>;
 }

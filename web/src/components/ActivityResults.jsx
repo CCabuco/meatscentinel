@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ACTIVITY_ACTIONS, ACTIVITY_PAGE_SIZE, activityDetail, formatActivityTime, listActivity } from '../lib/activity.js';
 
+// One line per event: time · action · who · detail · inspection.
+// Long details (account changes, remarks) are cut to one line; the full
+// text is on hover and expands on click.
 export default function ActivityResults({ filters, refreshKey = 0, compact = false }) {
   const [page, setPage] = useState(0);
   const [result, setResult] = useState({ entries: [], total: 0, error: null });
   const [loading, setLoading] = useState(true);
   const [retry, setRetry] = useState(0);
+  const [openId, setOpenId] = useState(null);
   const filterKey = JSON.stringify(filters);
 
   useEffect(() => {
@@ -41,33 +45,46 @@ export default function ActivityResults({ filters, refreshKey = 0, compact = fal
         </div>
       ) : (
         <ol className="divide-y divide-surface-line">
-          {result.entries.map((entry) => (
-            <li key={entry.id} className="p-5 min-w-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium text-ink">{ACTIVITY_ACTIONS[entry.action] ?? entry.action}</p>
-                <time dateTime={entry.occurred_at} className="text-xs text-ink-faint">{formatActivityTime(entry.occurred_at)}</time>
-              </div>
-              <p className="text-sm text-ink-muted mt-1 break-words">
-                {entry.inspector_name} <span className="font-mono text-xs">({entry.inspector_user_id})</span>
-              </p>
-              {entry.actor_user_id !== entry.inspector_user_id && (
-                <p className="text-xs text-ink-faint mt-1">Recorded actor: {entry.actor_name ?? 'System / authentication service'}{entry.actor_user_id ? ` (${entry.actor_user_id})` : ''}</p>
-              )}
-              {activityDetail(entry) && <p className="text-sm mt-3 whitespace-pre-wrap break-words text-ink">{activityDetail(entry)}</p>}
-              <div className="flex flex-wrap items-center gap-3 mt-3">
-                {entry.inspection_id && !compact && (
-                  <Link to={`/records/${encodeURIComponent(entry.inspection_id)}`} className="text-xs font-mono text-brand-600 hover:text-brand-700 break-all">{entry.inspection_id}</Link>
-                )}
-                <span className="text-xs rounded-md bg-surface-sunken px-2 py-1 text-ink-muted">
-                  {entry.source === 'app' ? 'Reported by app' : 'Recorded by system'}
-                </span>
-              </div>
-            </li>
-          ))}
+          {result.entries.map((entry) => {
+            const detail = activityDetail(entry);
+            const open = openId === entry.id;
+            const byOther = entry.actor_user_id !== entry.inspector_user_id;
+            return (
+              <li key={entry.id} className="px-4 py-2 text-sm min-w-0">
+                <div className="flex flex-wrap sm:flex-nowrap items-baseline gap-x-3 gap-y-0.5">
+                  <time dateTime={entry.occurred_at} className="text-xs text-ink-faint whitespace-nowrap tabular-nums sm:w-44 shrink-0">
+                    {formatActivityTime(entry.occurred_at)}
+                  </time>
+                  <span className="font-medium text-ink whitespace-nowrap">{ACTIVITY_ACTIONS[entry.action] ?? entry.action}</span>
+                  <span className="text-ink-muted whitespace-nowrap">
+                    {entry.inspector_name} <span className="font-mono text-xs">({entry.inspector_user_id})</span>
+                    {byOther && (
+                      <span className="text-xs text-ink-faint"> · by {entry.actor_name ?? 'system'}{entry.actor_user_id ? ` (${entry.actor_user_id})` : ''}</span>
+                    )}
+                  </span>
+                  {detail && (
+                    <button type="button" title={detail} onClick={() => setOpenId(open ? null : entry.id)}
+                      className={`text-left text-ink min-w-0 ${open ? 'whitespace-pre-wrap break-words' : 'truncate'} flex-1`}>
+                      {detail}
+                    </button>
+                  )}
+                  {entry.inspection_id && !compact && (
+                    <Link to={`/records/${encodeURIComponent(entry.inspection_id)}`} title={entry.inspection_id}
+                      className="text-xs font-mono text-brand-600 hover:text-brand-700 whitespace-nowrap ml-auto">
+                      {entry.inspection_id.length > 14 ? `${entry.inspection_id.slice(0, 8)}…${entry.inspection_id.slice(-4)}` : entry.inspection_id}
+                    </Link>
+                  )}
+                  <span className="text-[11px] text-ink-faint whitespace-nowrap" title={entry.source === 'app' ? 'Reported by app' : 'Recorded by system'}>
+                    {entry.source === 'app' ? 'app' : 'system'}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-line px-5 py-3">
-        <p className="text-xs text-ink-faint">{result.total === 0 ? '0 events' : `${page * ACTIVITY_PAGE_SIZE + 1}–${Math.min((page + 1) * ACTIVITY_PAGE_SIZE, result.total)} of ${result.total} events`}</p>
+        <p className="text-xs text-ink-faint">{result.total === 0 ? '0 events' : `${page * ACTIVITY_PAGE_SIZE + 1}–${Math.min((page + 1) * ACTIVITY_PAGE_SIZE, result.total)} of ${result.total} ${result.total === 1 ? 'event' : 'events'}`}</p>
         <div className="flex gap-2">
           <button className="btn-secondary text-xs" disabled={page === 0} onClick={() => setPage((n) => n - 1)}>Previous</button>
           <button className="btn-secondary text-xs" disabled={(page + 1) * ACTIVITY_PAGE_SIZE >= result.total} onClick={() => setPage((n) => n + 1)}>Next</button>

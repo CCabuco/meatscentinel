@@ -50,6 +50,12 @@ function applyTab(query, tab) {
 function applyFilters(query, filters) {
   let q = query;
 
+  // Part of an inspection ID typed in the search box.
+  if (filters.q) {
+    const text = filters.q.replace(/[%_\\,()]/g, '');
+    if (text) q = q.ilike('inspection_id', `%${text}%`);
+  }
+
   if (filters.sampleType) {
     q = q.eq('sample_type', filters.sampleType);
   }
@@ -134,6 +140,14 @@ export function pairingLabel(record) {
 }
 
 // Administrators only (enforced in the database). Pass null to unassign.
+// Shorter wording for table cells.
+export function pairingShort(record) {
+  if (record.has_gas_submission && record.has_image_submission) return 'Paired';
+  if (record.has_gas_submission) return 'Needs mobile';
+  if (record.has_image_submission) return 'Needs gas';
+  return 'Empty';
+}
+
 export async function assignInspection(inspectionId, inspectorId) {
   const { error } = await supabase.rpc('assign_inspection', {
     p_inspection_id: inspectionId,
@@ -290,6 +304,9 @@ export async function changeCaseStatus(inspectionId, authorId, status) {
 
 export async function getImageUrl(path) {
   if (!path) return null;
+  // A mobile result taken from a linked MSafe report keeps MSafe's own
+  // photo link (migration 021); it is not in our storage bucket.
+  if (/^https:\/\//.test(path)) return path;
   const { data, error } = await supabase.storage
     .from(IMAGE_BUCKET)
     .createSignedUrl(path, 60 * 10);

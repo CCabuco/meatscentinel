@@ -5,11 +5,12 @@ import Modal from '../components/Modal.jsx';
 import { usePageTitle } from '../components/PublicLayout.jsx';
 import ActivityResults from '../components/ActivityResults.jsx';
 import { reportInspectionView } from '../lib/activity.js';
-import { ClassificationBadge } from '../components/Badge.jsx';
+import { ClassificationBadge, ClassificationBadge as Classification, StatusPill } from '../components/Badge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime, formatPpm, titleCaseSample } from '../lib/format.js';
 import useAutoRefresh from '../lib/useAutoRefresh.js';
 import { listActiveInspectors } from '../lib/msafe.js';
+import { useStaff, staffLabel } from '../lib/staff.js';
 import {
   assignInspection,
   pairingLabel,
@@ -25,6 +26,7 @@ export default function RecordDetailPage() {
   const { inspectionId } = useParams();
   usePageTitle(`Record ${inspectionId}`);
   const { account } = useAuth();
+  const staff = useStaff();
 
   const [record, setRecord] = useState(null);
   const [timeline, setTimeline] = useState([]);
@@ -143,12 +145,9 @@ export default function RecordDetailPage() {
           ← Inspection records
         </Link>
         <div className="flex flex-wrap items-center gap-3 mt-2">
-          <h1 className="font-mono">{record.inspection_id}</h1>
-          <ClassificationBadge value={record.final_classification} />
-          <span className={`text-xs ${record.pairing_state === 'paired' ? 'font-medium text-ink' : 'text-ink-muted'}`}>
-            {pairingLabel(record)}
-          </span>
+          <h1 className="font-mono break-all">{record.inspection_id}</h1>
         </div>
+        <SummaryBar record={record} currentStatus={currentStatus} staff={staff} />
       </div>
 
       {feedback && (
@@ -169,13 +168,14 @@ export default function RecordDetailPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <FusionPanel record={record} />
-          <DetailPanel record={record} currentStatus={currentStatus} />
+          <DetailPanel record={record} currentStatus={currentStatus} staff={staff} />
           <ImagePanel record={record} imageUrl={imageUrl} onViewed={() => reportView('image_viewed')} />
         </div>
 
         <div className="space-y-6">
           <AssignmentPanel
             record={record}
+            staff={staff}
             admin={account.role === 'administrator'}
             onAssigned={(message) => {
               setFeedback({ tone: 'success', message });
@@ -296,7 +296,29 @@ function InputCard({ label, present, valid, value, missingText, invalidText }) {
 
 // Who is responsible for this inspection. Administrators can assign,
 // reassign or unassign; the inspector is emailed when it changes.
-function AssignmentPanel({ record, admin, onAssigned, onError }) {
+// The key facts in one line at the top, so nobody has to scroll for them.
+function SummaryBar({ record, currentStatus, staff }) {
+  const paired = record.has_gas_submission && record.has_image_submission;
+  const inspector = record.assignment
+    ? staffLabel(staff, record.assignment.inspector_id, record.assignment.inspector_name ?? '—')
+    : 'Unassigned';
+  return (
+    <dl className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-surface-line bg-surface px-4 py-2.5 text-sm">
+      <div className="flex items-center gap-2"><dt className="text-ink-muted">Result</dt>
+        <dd><Classification value={record.final_classification} /></dd></div>
+      <div className="flex items-center gap-2"><dt className="text-ink-muted">Pairing</dt>
+        <dd className={paired ? 'font-medium' : 'text-ink-muted'}>{pairingLabel(record)}</dd></div>
+      <div className="flex items-center gap-2"><dt className="text-ink-muted">Case</dt>
+        <dd><StatusPill value={currentStatus} /></dd></div>
+      <div className="flex items-center gap-2"><dt className="text-ink-muted">Sample</dt>
+        <dd>{titleCaseSample(record.sample_type)}</dd></div>
+      <div className="flex items-center gap-2 min-w-0"><dt className="text-ink-muted">Inspector</dt>
+        <dd className="truncate">{inspector}</dd></div>
+    </dl>
+  );
+}
+
+function AssignmentPanel({ record, staff, admin, onAssigned, onError }) {
   const [inspectors, setInspectors] = useState(null);
   const [choice, setChoice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -332,7 +354,9 @@ function AssignmentPanel({ record, admin, onAssigned, onError }) {
   return (
     <section className="card p-5">
       <h2 className="mb-1">Assigned inspector</h2>
-      <p className="text-sm text-ink mb-1">{assignment?.inspector_name ?? 'Unassigned'}</p>
+      <p className="text-sm text-ink mb-1">
+        {assignment ? staffLabel(staff, assignment.inspector_id, assignment.inspector_name ?? '—') : 'Unassigned'}
+      </p>
       <p className="text-xs text-ink-faint mb-4">
         {direct
           ? `Assigned by ${assignment.assigned_by_name ?? 'an administrator'} · ${formatDateTime(assignment.assigned_at)}`
@@ -375,14 +399,23 @@ function AssignmentPanel({ record, admin, onAssigned, onError }) {
   );
 }
 
-function DetailPanel({ record, currentStatus }) {
+// Readings and sources. Collapsed by default: the summary bar and the
+// decision fusion panel already show what most visits need.
+function DetailPanel({ record, currentStatus, staff }) {
   return (
-    <section className="card p-5">
-      <h2 className="mb-4">Inspection details</h2>
+    <details className="card p-5 group">
+      <summary className="cursor-pointer flex items-baseline justify-between gap-3">
+        <h2 className="inline">Inspection details</h2>
+        <span className="text-sm text-brand-700">
+          <span className="group-open:hidden">Show readings and sources</span>
+          <span className="hidden group-open:inline">Show less</span>
+        </span>
+      </summary>
+      <div className="mt-4">
       <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
         <Detail label="Inspection ID" value={record.inspection_id} mono />
-        <Detail label="Assigned inspector" value={record.assignment?.inspector_name
-          ? `${record.assignment.inspector_name}${record.assignment.inspector_user_id ? ` (${record.assignment.inspector_user_id})` : ''}`
+        <Detail label="Assigned inspector" value={record.assignment
+          ? staffLabel(staff, record.assignment.inspector_id, record.assignment.inspector_name ?? '—')
           : 'Unassigned'} />
         {record.assignment?.scan_id && <Detail label="Linked mobile scan" value={record.assignment.scan_id} mono />}
         {record.msafeReports?.length > 0 && (
@@ -413,7 +446,8 @@ function DetailPanel({ record, currentStatus }) {
         <Detail label="External image-based result" value={record.image_result ?? '—'} />
         <Detail label="Current case status" value={currentStatus ?? '—'} />
       </dl>
-    </section>
+      </div>
+    </details>
   );
 }
 
@@ -440,7 +474,9 @@ function ImagePanel({ record, imageUrl, onViewed }) {
     <section className="card p-5">
       <h2 className="mb-1">Image documentation</h2>
       <p className="text-sm text-ink-muted mb-4">
-        Stored for documentation only. MeatScentinel does not analyse this image.
+        {/^https:\/\//.test(record.image_path ?? '')
+          ? 'Photo from the linked MSafe report (hosted by MSafe). For documentation only.'
+          : 'Stored for documentation only. MeatScentinel does not analyse this image.'}
       </p>
 
       {imageUrl ? (

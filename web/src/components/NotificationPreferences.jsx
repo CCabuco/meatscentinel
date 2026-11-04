@@ -48,7 +48,7 @@ export default function NotificationPreferences({ account, global = false }) {
           <p className="text-xs text-ink-muted">{global ? 'Disabled categories are skipped, not held for later. ' : 'Emails already submitted to the provider cannot be recalled. '}Login verification codes and password recovery are separate and remain enabled.</p>
           {error && <p className="alert-error" role="alert">{error}</p>}
           {notice && <p className="alert-success" role="status">{notice}</p>}
-          <div className="flex items-center gap-3"><button className="btn-primary" disabled={saving || !changed}>{saving ? 'Saving…' : 'Save preferences'}</button>
+          <div className="flex items-center gap-3"><button className="btn-primary" disabled={saving || !changed}>{saving ? 'Saving…' : global ? 'Save settings' : 'Save preferences'}</button>
             {changed && <span className="text-xs text-ink-muted">Unsaved changes</span>}</div>
         </div>
       </form>}

@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
-import { ClassificationBadge, StatusPill, SourceMarks } from '../components/Badge.jsx';
+import { ClassificationBadge, StatusPill } from '../components/Badge.jsx';
+import FilterBar, { FilterSelect } from '../components/FilterBar.jsx';
 import useAutoRefresh from '../lib/useAutoRefresh.js';
-import { formatDateTime, formatPpm, titleCaseSample } from '../lib/format.js';
+import { useStaff, staffLabel } from '../lib/staff.js';
+import { formatDate, titleCaseSample } from '../lib/format.js';
 import {
   listRecords,
+  pairingLabel,
+  pairingShort,
   PAGE_SIZE,
   TABS,
   SAMPLE_TYPES,
@@ -16,6 +20,7 @@ import {
 } from '../lib/records.js';
 
 const EMPTY_FILTERS = {
+  q: '',
   sampleType: '',
   sourceType: '',
   classification: '',
@@ -24,6 +29,15 @@ const EMPTY_FILTERS = {
   dateFrom: '',
   dateTo: '',
 };
+
+const CLASSIFICATION_OPTIONS = [
+  ...CLASSIFICATIONS.map((c) => ({ value: c, label: c })),
+  { value: '__pending', label: 'Pending (not yet classified)' },
+];
+const ASSIGNED_OPTIONS = [
+  { value: 'mine', label: 'Assigned to me' },
+  { value: 'unassigned', label: 'Unassigned' },
+];
 
 // Links such as /records?classification=For+Review or /records?assigned=mine
 // (from the Dashboard) open the list already filtered.
@@ -36,9 +50,12 @@ function filtersFromUrl(params) {
   return filters;
 }
 
+const labelFor = (options, value) => options.find((o) => o.value === value)?.label ?? value;
+
 export default function RecordsPage() {
   const [searchParams] = useSearchParams();
   const { account } = useAuth();
+  const staff = useStaff();
   const [tab, setTab] = useState(() => {
     const t = searchParams.get('tab');
     return TABS.some((x) => x.id === t) ? t : 'all';
@@ -56,10 +73,7 @@ export default function RecordsPage() {
     const mine = ++sequence.current;
     if (!silent) setLoading(true);
     const { records: rows, total: count, error: loadError } = await listRecords({
-      tab,
-      filters,
-      page,
-      accountId: account.id,
+      tab, filters, page, accountId: account.id,
     });
     if (mine !== sequence.current) return; // a newer load replaced this one
     if (silent && loadError) return; // keep what is on screen; the next refresh retries
@@ -69,9 +83,7 @@ export default function RecordsPage() {
     setLoading(false);
   }, [tab, filters, page, account.id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   // New gas readings, mobile results, pairings, status changes and
   // assignments appear without reloading the page.
@@ -87,10 +99,15 @@ export default function RecordsPage() {
     setPage(0);
   }
 
-  const activeFilterCount = useMemo(
-    () => Object.values(filters).filter(Boolean).length,
-    [filters]
-  );
+  const chips = [
+    filters.sampleType && { key: 'sampleType', label: `Sample: ${titleCaseSample(filters.sampleType)}` },
+    filters.sourceType && { key: 'sourceType', label: labelFor(SOURCE_TYPES.map((s) => ({ value: s.id, label: s.label })), filters.sourceType) },
+    filters.classification && { key: 'classification', label: labelFor(CLASSIFICATION_OPTIONS, filters.classification) },
+    filters.caseStatus && { key: 'caseStatus', label: `Case: ${filters.caseStatus}` },
+    filters.assigned && { key: 'assigned', label: labelFor(ASSIGNED_OPTIONS, filters.assigned) },
+    filters.dateFrom && { key: 'dateFrom', label: `From ${filters.dateFrom}` },
+    filters.dateTo && { key: 'dateTo', label: `To ${filters.dateTo}` },
+  ].filter(Boolean).map((chip) => ({ ...chip, onRemove: () => updateFilter(chip.key, '') }));
 
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
 
@@ -98,49 +115,64 @@ export default function RecordsPage() {
     <AppShell>
       <PageHeader
         title="Inspection records"
-        description="All inspection records, including those still waiting for a counterpart."
+        description="Every inspection, including those still waiting for their gas or mobile result."
       />
 
       <div className="card overflow-hidden">
         <TabBar tab={tab} onSelect={selectTab} />
 
-        <Filters
-          filters={filters}
-          onChange={updateFilter}
-          onClear={() => {
-            setFilters(EMPTY_FILTERS);
-            setPage(0);
-          }}
-          activeCount={activeFilterCount}
-        />
+        <FilterBar
+          search={filters.q}
+          onSearch={(text) => updateFilter('q', text)}
+          searchPlaceholder="Search inspection ID…"
+          searchLabel="Search inspection ID"
+          chips={chips}
+          onClearAll={() => { setFilters((prev) => ({ ...EMPTY_FILTERS, q: prev.q })); setPage(0); }}
+        >
+          <FilterSelect label="Final classification" value={filters.classification}
+            onChange={(v) => updateFilter('classification', v)} options={CLASSIFICATION_OPTIONS} />
+          <FilterSelect label="Case status" value={filters.caseStatus}
+            onChange={(v) => updateFilter('caseStatus', v)} options={CASE_STATUSES.map((s) => ({ value: s, label: s }))} />
+          <FilterSelect label="Assigned inspector" value={filters.assigned}
+            onChange={(v) => updateFilter('assigned', v)} options={ASSIGNED_OPTIONS} />
+          <FilterSelect label="Sample type" value={filters.sampleType}
+            onChange={(v) => updateFilter('sampleType', v)}
+            options={SAMPLE_TYPES.map((s) => ({ value: s, label: titleCaseSample(s) }))} />
+          <FilterSelect label="Source type" value={filters.sourceType}
+            onChange={(v) => updateFilter('sourceType', v)}
+            options={SOURCE_TYPES.map((s) => ({ value: s.id, label: s.label }))} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label" htmlFor="dateFrom">From</label>
+              <input id="dateFrom" type="date" className="input" value={filters.dateFrom}
+                onChange={(e) => updateFilter('dateFrom', e.target.value)} />
+            </div>
+            <div>
+              <label className="label" htmlFor="dateTo">To</label>
+              <input id="dateTo" type="date" className="input" value={filters.dateTo}
+                onChange={(e) => updateFilter('dateTo', e.target.value)} />
+            </div>
+          </div>
+        </FilterBar>
 
         {/*
           DB-03 — sample type lives on the gas submission, so an unpaired
           mobile submission carries none and cannot match this filter.
-          Saying so beats leaving someone to wonder where the records went.
         */}
         {filters.sampleType && (
-          <div className="px-5 py-2.5 border-b border-surface-line bg-state-reviewBg/40">
-            <p className="text-xs text-state-review">
-              Sample type is recorded on the gas submission. Unpaired mobile app
-              submissions have no sample type and are not shown while this filter
-              is applied.
-            </p>
-          </div>
+          <p className="px-5 py-2 border-b border-surface-line bg-state-reviewBg/40 text-xs text-state-review">
+            Sample type comes from the gas reading, so mobile-only records are hidden while this filter is on.
+          </p>
         )}
 
-        {error && (
-          <div className="p-5">
-            <div className="alert-error">{error}</div>
-          </div>
-        )}
+        {error && <div className="p-5"><div className="alert-error">{error}</div></div>}
 
         {loading ? (
           <p className="p-8 text-sm text-ink-faint text-center">Loading records…</p>
         ) : records.length === 0 ? (
-          <EmptyState hasFilters={activeFilterCount > 0 || tab !== 'all'} />
+          <EmptyState hasFilters={chips.length > 0 || Boolean(filters.q) || tab !== 'all'} />
         ) : (
-          <RecordTable records={records} />
+          <RecordTable records={records} staff={staff} />
         )}
 
         <Pagination
@@ -158,17 +190,18 @@ export default function RecordsPage() {
 
 function TabBar({ tab, onSelect }) {
   return (
-    <div className="flex gap-1 px-3 pt-3 pb-0 border-b border-surface-line overflow-x-auto">
+    <div className="flex gap-1 px-3 pt-3 pb-0 border-b border-surface-line overflow-x-auto" role="tablist">
       {TABS.map((item) => (
         <button
           key={item.id}
+          role="tab"
+          aria-selected={tab === item.id}
           onClick={() => onSelect(item.id)}
-          className={[
-            'whitespace-nowrap rounded-t-lg px-3 py-2 text-sm transition-colors border-b-2 -mb-px',
+          className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
             tab === item.id
               ? 'border-brand-600 text-brand-700 font-medium'
-              : 'border-transparent text-ink-muted hover:text-ink',
-          ].join(' ')}
+              : 'border-transparent text-ink-muted hover:text-ink'
+          }`}
         >
           {item.label}
         </button>
@@ -177,160 +210,53 @@ function TabBar({ tab, onSelect }) {
   );
 }
 
-function Filters({ filters, onChange, onClear, activeCount }) {
-  return (
-    <div className="px-5 py-4 border-b border-surface-line bg-surface-sunken/40">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Select
-          label="Sample type"
-          value={filters.sampleType}
-          onChange={(v) => onChange('sampleType', v)}
-          options={SAMPLE_TYPES.map((s) => ({ value: s, label: titleCaseSample(s) }))}
-        />
-        <Select
-          label="Source type"
-          value={filters.sourceType}
-          onChange={(v) => onChange('sourceType', v)}
-          options={SOURCE_TYPES.map((s) => ({ value: s.id, label: s.label }))}
-        />
-        <Select
-          label="Final classification"
-          value={filters.classification}
-          onChange={(v) => onChange('classification', v)}
-          options={[
-            ...CLASSIFICATIONS.map((c) => ({ value: c, label: c })),
-            { value: '__pending', label: 'Pending (not yet classified)' },
-          ]}
-        />
-        <Select
-          label="Case status"
-          value={filters.caseStatus}
-          onChange={(v) => onChange('caseStatus', v)}
-          options={CASE_STATUSES.map((s) => ({ value: s, label: s }))}
-        />
-        <Select
-          label="Assigned inspector"
-          value={filters.assigned}
-          onChange={(v) => onChange('assigned', v)}
-          options={[
-            { value: 'mine', label: 'Assigned to me' },
-            { value: 'unassigned', label: 'Unassigned' },
-          ]}
-        />
-        <div>
-          <label className="label" htmlFor="dateFrom">From date</label>
-          <input
-            id="dateFrom"
-            type="date"
-            className="input"
-            value={filters.dateFrom}
-            onChange={(e) => onChange('dateFrom', e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="dateTo">To date</label>
-          <input
-            id="dateTo"
-            type="date"
-            className="input"
-            value={filters.dateTo}
-            onChange={(e) => onChange('dateTo', e.target.value)}
-          />
-        </div>
-      </div>
-
-      {activeCount > 0 && (
-        <div className="mt-3 flex items-center gap-3">
-          <span className="text-xs text-ink-muted">
-            {activeCount} filter{activeCount === 1 ? '' : 's'} applied
-          </span>
-          <button onClick={onClear} className="text-xs text-brand-600 hover:text-brand-700">
-            Clear all
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Select({ label, value, onChange, options }) {
-  const id = `filter-${label.replace(/\s+/g, '-').toLowerCase()}`;
-  return (
-    <div>
-      <label className="label" htmlFor={id}>{label}</label>
-      <select
-        id={id}
-        className="input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Any</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function RecordTable({ records }) {
+// One line per record. Gas readings and the image result are on the record
+// page; the list shows only what is needed to decide what to open.
+function RecordTable({ records, staff }) {
+  const navigate = useNavigate();
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[900px]">
+      <table className="w-full text-sm min-w-[720px]">
         <thead>
           <tr className="border-b border-surface-line text-left">
             <Th>Inspection ID</Th>
             <Th>Sample</Th>
-            <Th>Sources</Th>
-            <Th>Gas readings</Th>
-            <Th>Image result</Th>
-            <Th>Classification</Th>
-            <Th>Case status</Th>
+            <Th>Pairing</Th>
+            <Th>Result</Th>
+            <Th>Case</Th>
+            <Th>Inspector</Th>
             <Th>Recorded</Th>
-            <Th className="w-px" />
+            <Th className="w-px"><span className="sr-only">Open</span></Th>
           </tr>
         </thead>
         <tbody>
-          {records.map((row) => (
-            <tr
-              key={row.inspection_id}
-              className="border-b border-surface-line last:border-0 hover:bg-surface-sunken/60"
-            >
-              <Td>
-                <InspectionId value={row.inspection_id} />
-                <p className="text-xs text-ink-muted mt-1" title={row.assignment?.inspector_user_id ?? ''}>
-                  Inspector: {row.assignment?.inspector_name ?? 'Unassigned'}
-                  {row.msafeReports?.length > 0 && ` · MSafe report${row.msafeReports.length === 1 ? '' : 's'} linked`}
-                </p>
-              </Td>
-              <Td className="whitespace-nowrap">
-                {titleCaseSample(row.sample_type)}
-              </Td>
-              <Td>
-                <SourceMarks
-                  hasGas={row.has_gas_submission}
-                  hasImage={row.has_image_submission}
-                />
-              </Td>
-              <Td>
-                <GasReadings nh3={row.nh3_ppm} h2s={row.h2s_ppm} />
-              </Td>
-              <Td className="whitespace-nowrap">{row.image_result ?? '—'}</Td>
-              <Td><ClassificationBadge value={row.final_classification} /></Td>
-              <Td><StatusPill value={row.current_case_status} /></Td>
-              <Td className="text-ink-muted whitespace-nowrap">
-                {formatDateTime(row.created_at)}
-              </Td>
-              <Td className="text-right whitespace-nowrap">
-                <Link
-                  to={`/records/${encodeURIComponent(row.inspection_id)}`}
-                  className="btn-secondary text-xs py-1.5 px-3"
-                >
-                  View
-                </Link>
-              </Td>
-            </tr>
-          ))}
+          {records.map((row) => {
+            const href = `/records/${encodeURIComponent(row.inspection_id)}`;
+            const inspector = row.assignment
+              ? staffLabel(staff, row.assignment.inspector_id, row.assignment.inspector_name ?? '—')
+              : '—';
+            const paired = row.has_gas_submission && row.has_image_submission;
+            return (
+              <tr
+                key={row.inspection_id}
+                onClick={(e) => { if (!e.target.closest('a')) navigate(href); }}
+                className="border-b border-surface-line last:border-0 hover:bg-surface-sunken/60 cursor-pointer"
+              >
+                <Td><InspectionId value={row.inspection_id} /></Td>
+                <Td>{titleCaseSample(row.sample_type)}</Td>
+                <Td className={paired ? 'font-medium text-ink' : 'text-ink-muted'} title={pairingLabel(row)}>{pairingShort(row)}</Td>
+                <Td><ClassificationBadge value={row.final_classification} /></Td>
+                <Td><StatusPill value={row.current_case_status} /></Td>
+                <Td className="max-w-[13rem] truncate" title={inspector}>
+                  <span className={row.assignment ? 'text-ink' : 'text-ink-faint'}>{inspector}</span>
+                </Td>
+                <Td className="text-ink-muted">{formatDate(row.created_at)}</Td>
+                <Td className="text-right">
+                  <Link to={href} className="btn-secondary text-xs py-1 px-3">View</Link>
+                </Td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -339,56 +265,22 @@ function RecordTable({ records }) {
 
 function Th({ children, className = '' }) {
   return (
-    <th
-      className={`px-4 py-3 text-xs font-medium text-ink-muted whitespace-nowrap ${className}`}
-    >
+    <th className={`px-3 py-2.5 text-xs font-medium text-ink-muted whitespace-nowrap ${className}`}>
       {children}
     </th>
   );
 }
 
-function Td({ children, className = '' }) {
-  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+function Td({ children, className = '', title }) {
+  return <td title={title} className={`px-3 py-2.5 align-middle whitespace-nowrap ${className}`}>{children}</td>;
 }
 
-// Inspection IDs are long enough to wrap onto several lines, which made every
-// row three times taller than its content needed. The identifier is shown
-// abbreviated; the full value is available on hover and on the record page,
-// which is where anyone actually needs to read it in full.
+// The identifier is shown abbreviated; the full value is on hover and on
+// the record page.
 function InspectionId({ value }) {
   const text = String(value ?? '');
   const short = text.length > 14 ? `${text.slice(0, 8)}…${text.slice(-4)}` : text;
-
-  return (
-    <span
-      title={text}
-      className="font-mono text-xs text-ink whitespace-nowrap cursor-default"
-    >
-      {short}
-    </span>
-  );
-}
-
-// NH₃ and H₂S occupied two columns and wrapped their units onto a second
-// line. One column, stacked, keeps both readable and gives the table the
-// width it needs for the action button.
-function GasReadings({ nh3, h2s }) {
-  if (nh3 == null && h2s == null) {
-    return <span className="text-ink-faint">—</span>;
-  }
-
-  return (
-    <div className="whitespace-nowrap tabular-nums text-xs leading-tight">
-      <div>
-        <span className="text-ink-faint">NH₃</span>{' '}
-        <span className="text-ink">{formatPpm(nh3)}</span>
-      </div>
-      <div className="mt-0.5">
-        <span className="text-ink-faint">H₂S</span>{' '}
-        <span className="text-ink">{formatPpm(h2s)}</span>
-      </div>
-    </div>
-  );
+  return <span title={text} className="font-mono text-xs text-ink">{short}</span>;
 }
 
 function EmptyState({ hasFilters }) {
@@ -396,9 +288,7 @@ function EmptyState({ hasFilters }) {
     <div className="p-10 text-center">
       <p className="text-sm text-ink">No records match this view.</p>
       {hasFilters && (
-        <p className="text-sm text-ink-muted mt-1">
-          Try clearing a filter or switching tabs.
-        </p>
+        <p className="text-sm text-ink-muted mt-1">Try clearing a filter, the search, or switching tabs.</p>
       )}
     </div>
   );
@@ -414,16 +304,8 @@ function Pagination({ page, lastPage, total, shown, onPrev, onNext }) {
         {total === 0 ? 'No records' : `Showing ${first}–${last} of ${total}`}
       </p>
       <div className="flex gap-2">
-        <button className="btn-secondary text-xs py-1.5" onClick={onPrev} disabled={page === 0}>
-          Previous
-        </button>
-        <button
-          className="btn-secondary text-xs py-1.5"
-          onClick={onNext}
-          disabled={page >= lastPage}
-        >
-          Next
-        </button>
+        <button className="btn-secondary text-xs py-1.5" onClick={onPrev} disabled={page === 0}>Previous</button>
+        <button className="btn-secondary text-xs py-1.5" onClick={onNext} disabled={page >= lastPage}>Next</button>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ export const NOTIFICATION_CATEGORIES = {
   assignments: ['Assignments', 'New assignments, claimed reports, and reassignment notices.'],
   remarks: ['Remarks', 'New remarks on an assigned inspection.'],
   statuses: ['Case status', 'Changes such as Open, Under Review, or Resolved.'],
-  results: ['Results and linked reports', 'Gas or image submissions, final classifications, inspection links, and refreshed mobile report changes.'],
+  results: ['Results and linked reports', 'Gas or mobile results received, gas and mobile paired with the final classification, and linked MSafe reports.'],
 };
 export const DELIVERY_LABELS = {
   pending: 'Queued', processing: 'Sending', accepted: 'Accepted by email provider',

@@ -12,11 +12,17 @@ export const ACTIVITY_ACTIONS = {
   email_change_cancelled: 'Cancelled email change',
   record_viewed: 'Opened inspection',
   image_viewed: 'Viewed image',
-  report_claimed: 'Claimed customer report',
-  report_assigned: 'Assigned customer report',
-  report_linked: 'Linked customer report',
-  report_viewed: 'Opened customer report',
-  report_image_viewed: 'Viewed mobile scan image',
+  inspection_assigned: 'Assigned to inspection',
+  inspection_unassigned: 'Removed from inspection',
+  msafe_claimed: 'Claimed MSafe report',
+  msafe_assigned: 'Assigned MSafe report',
+  msafe_linked: 'Linked MSafe report to inspection',
+  msafe_response_sent: 'Sent MSafe response',
+  report_claimed: 'CheckMeat (retired): claimed report',
+  report_assigned: 'CheckMeat (retired): assigned report',
+  report_linked: 'CheckMeat (retired): linked report',
+  report_viewed: 'CheckMeat (retired): opened report',
+  report_image_viewed: 'CheckMeat (retired): viewed scan image',
 };
 
 export async function listActivity(filters = {}, page = 0) {
@@ -67,6 +73,13 @@ export function activityDetail(entry) {
     const assignment = ['report_claimed', 'report_assigned'].includes(entry.action)
       ? ` · ${details.before ?? 'Unassigned'} → ${details.after ?? 'Unassigned'}` : '';
     return `Mobile scan ${details.scan_id ?? ''}${assignment}`;
+  }
+  if (entry.action === 'inspection_assigned' || entry.action === 'inspection_unassigned') {
+    return `${details.before ?? 'Unassigned'} → ${details.after ?? 'Unassigned'}`;
+  }
+  if (entry.action.startsWith('msafe_')) {
+    const id = details.msafe_report_id ? `MSafe report ${String(details.msafe_report_id).slice(0, 8)}…` : 'MSafe report';
+    return entry.action === 'msafe_assigned' && details.after ? `${id} → ${details.after}` : id;
   }
   if (entry.action === 'remark_added') return details.content ?? '';
   if (entry.action === 'status_changed') return `${showValue(details.before)} → ${showValue(details.after)}`;

@@ -44,6 +44,10 @@ export default function AppShell({ children }) {
 
   return (
     <div className="min-h-screen flex bg-surface-sunken">
+      {/* First thing keyboard users reach: jump past the menu. */}
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 btn-primary">
+        Skip to main content
+      </a>
       <aside className="w-60 shrink-0 border-r border-surface-line bg-surface flex flex-col">
         <div className="px-5 py-5 border-b border-surface-line">
           <p className="text-sm font-medium text-ink">MeatScentinel</p>
@@ -84,8 +88,8 @@ export default function AppShell({ children }) {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0">
-        <div className="max-w-5xl mx-auto px-8 py-8">{children}</div>
+      <main id="main" tabIndex={-1} className="flex-1 min-w-0 focus:outline-none">
+        <div className="max-w-6xl mx-auto px-6 lg:px-8 py-8">{children}</div>
       </main>
     </div>
   );

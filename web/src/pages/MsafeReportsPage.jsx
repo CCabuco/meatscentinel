@@ -4,6 +4,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import AppShell, { PageHeader } from '../components/AppShell.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatActivityTime } from '../lib/activity.js';
+import { formatDate } from '../lib/format.js';
+import FilterBar, { FilterSelect } from '../components/FilterBar.jsx';
+import { useStaff, staffLabel } from '../lib/staff.js';
 import {
   assignMsafeReport, claimMsafeReport, deleteMsafeDraft, getMsafeReport, linkMsafeInspection, listActiveInspectors,
   listMsafeDrafts, listMsafeHistory, listMsafeReports, listMsafeResponses, MSAFE_PAGE_SIZE, MSAFE_STATUSES,
@@ -35,6 +38,7 @@ const pick = (value, options, fallback) => (options.some(([id]) => id === value)
 
 export default function MsafeReportsPage() {
   const { account } = useAuth();
+  const staff = useStaff();
   const admin = account?.role === 'administrator';
   const views = [['all', 'All reports'], ['unassigned', 'Unassigned'], ...(!admin ? [['mine', 'Assigned to me']] : [['assigned', 'Assigned']])];
 
@@ -85,54 +89,73 @@ export default function MsafeReportsPage() {
 
   return <AppShell>
     <PageHeader title="MSafe reports" description="Spoiled-meat reports sent by MSafe users and suppliers." />
-    <div className="card p-4 mb-5 text-sm text-ink-muted">
-      Claim a report (or have an administrator assign it), then write a response. Responses are saved as drafts first.
-      When you choose Send to reporter, the response is locked and the reporter sees it from "MeatScentinel Inspector".
-      Internal notes are never sent.
-    </div>
-    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Report view">
-        {views.map(([id, label]) => <button key={id} className={view === id ? 'btn-primary' : 'btn-secondary'}
-          aria-pressed={view === id} onClick={() => update({ view: id })}>{label}</button>)}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <select aria-label="Report status" className="input w-auto" value={status} onChange={(e) => update({ status: e.target.value })}>
-          {STATUS_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-        </select>
-        <select aria-label="Report type" className="input w-auto" value={type} onChange={(e) => update({ type: e.target.value })}>
-          {TYPE_FILTERS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-        </select>
-        <button className="btn-secondary" disabled={loading} onClick={() => setRevision((v) => v + 1)}>Refresh</button>
-      </div>
-    </div>
+    <details className="mb-4 text-sm text-ink-muted">
+      <summary className="cursor-pointer text-brand-700 w-fit">How MSafe reports work</summary>
+      <p className="mt-2 max-w-3xl">
+        Claim a report (or have an administrator assign it), then write a response. Responses are saved as drafts first.
+        When you choose Send to reporter, the response is locked and the reporter sees it from "MeatScentinel Inspector".
+        Internal notes are never sent. Linking a report to an inspection uses its scan as that inspection's mobile result.
+      </p>
+    </details>
 
-    {error ? <div role="alert" className="alert-error"><p>{error}</p><button className="btn-secondary mt-3" onClick={() => setRevision((v) => v + 1)}>Retry</button></div>
-      : loading ? <p role="status" className="text-sm text-ink-faint">Loading reports…</p>
-      : rows.length === 0 ? <div className="card p-8 text-center text-sm text-ink-muted">
-          No MSafe reports match this view.
-          {filtered && <div className="mt-3"><button className="btn-secondary" onClick={() => setParams({}, { replace: true })}>Clear filters</button></div>}
-        </div>
-      : <div className="space-y-3">{rows.map((report) => <article className="card p-5" key={report.msafe_report_id}>
-        <div className="flex flex-wrap justify-between gap-3">
-          <div>
-            <h2 className="capitalize">{report.report_type} report
-              {report.meat_type && <span className="text-sm font-normal"> · {report.meat_type}</span>}
-              {report.scan_result && <span className="text-sm font-normal normal-case"> · {report.scan_result}</span>}
-            </h2>
-            <p className="text-xs font-mono text-ink-faint break-all mt-1">{report.msafe_report_id}</p>
+    <div className="card overflow-hidden">
+      <div className="flex gap-1 px-3 pt-3 border-b border-surface-line overflow-x-auto" role="tablist" aria-label="Report view">
+        {views.map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={view === id} onClick={() => update({ view: id })}
+            className={`px-3 py-2 text-sm whitespace-nowrap border-b-2 -mb-px ${view === id
+              ? 'border-brand-600 text-brand-700 font-medium' : 'border-transparent text-ink-muted hover:text-ink'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <FilterBar
+        chips={[
+          status !== 'all' && { key: 'status', label: `Status: ${STATUS_FILTERS.find(([id]) => id === status)?.[1]}`, onRemove: () => update({ status: null }) },
+          type !== 'all' && { key: 'type', label: TYPE_FILTERS.find(([id]) => id === type)?.[1], onRemove: () => update({ type: null }) },
+        ].filter(Boolean)}
+        onClearAll={() => update({ status: null, type: null })}
+        actions={<button className="btn-secondary" disabled={loading} onClick={() => setRevision((v) => v + 1)}>Refresh</button>}
+      >
+        <FilterSelect label="Status" value={status === 'all' ? '' : status} onChange={(v) => update({ status: v })}
+          options={STATUS_FILTERS.filter(([id]) => id !== 'all').map(([value, label]) => ({ value, label }))} anyLabel="All statuses" />
+        <FilterSelect label="Type" value={type === 'all' ? '' : type} onChange={(v) => update({ type: v })}
+          options={TYPE_FILTERS.filter(([id]) => id !== 'all').map(([value, label]) => ({ value, label }))} anyLabel="All types" />
+      </FilterBar>
+
+      {error ? <div role="alert" className="alert-error m-4"><p>{error}</p><button className="btn-secondary mt-3" onClick={() => setRevision((v) => v + 1)}>Retry</button></div>
+        : loading ? <p role="status" className="p-8 text-center text-sm text-ink-faint">Loading reports…</p>
+        : rows.length === 0 ? <div className="p-8 text-center text-sm text-ink-muted">
+            No MSafe reports match this view.
+            {filtered && <div className="mt-3"><button className="btn-secondary" onClick={() => setParams({}, { replace: true })}>Clear filters</button></div>}
           </div>
-          <div className="flex items-center gap-3"><StatusTag status={report.latest_status} />
-            <button className="btn-secondary" onClick={() => update({ report: report.msafe_report_id })}>View report</button></div>
-        </div>
-        <dl className="grid sm:grid-cols-4 gap-3 mt-4 text-sm">
-          <Field label="Received">{formatActivityTime(report.received_at)}</Field>
-          <Field label={report.report_type === 'supplier' ? 'Supplier' : 'Purchased at'}>
-            {report.report_type === 'supplier' ? report.supplier_name : report.purchase_location}
-          </Field>
-          <Field label="Assigned inspector">{report.inspector_name ?? 'Unassigned'}</Field>
-          <Field label="Responses sent">{report.response_count}</Field>
-        </dl>
-      </article>)}</div>}
+        : <div className="overflow-x-auto"><table className="w-full text-sm min-w-[760px]">
+          <thead><tr className="border-b border-surface-line text-left">
+            {['Report', 'Scan', 'From', 'Inspector', 'Status', 'Sent', 'Received'].map((h) => (
+              <th key={h} className="px-3 py-2.5 text-xs font-medium text-ink-muted whitespace-nowrap">{h}</th>))}
+            <th className="w-px"><span className="sr-only">Open</span></th>
+          </tr></thead>
+          <tbody>{rows.map((report) => {
+            const from = report.report_type === 'supplier' ? report.supplier_name : report.purchase_location;
+            const inspector = report.inspector_id ? staffLabel(staff, report.inspector_id, report.inspector_name) : 'Unassigned';
+            return <tr key={report.msafe_report_id} onClick={(e) => { if (!e.target.closest('button')) update({ report: report.msafe_report_id }); }}
+              className="border-b border-surface-line last:border-0 hover:bg-surface-sunken/60 cursor-pointer">
+              <td className="px-3 py-2.5 whitespace-nowrap">
+                <span className="capitalize">{report.report_type}</span>{' '}
+                <span className="font-mono text-xs text-ink-faint" title={report.msafe_report_id}>{report.msafe_report_id.slice(0, 8)}…</span>
+              </td>
+              <td className="px-3 py-2.5 whitespace-nowrap capitalize">{[report.meat_type, report.scan_result].filter(Boolean).join(' · ') || '—'}</td>
+              <td className="px-3 py-2.5 max-w-[12rem] truncate" title={from ?? ''}>{from || '—'}</td>
+              <td className={`px-3 py-2.5 max-w-[14rem] truncate ${report.inspector_id ? '' : 'text-ink-faint'}`} title={inspector}>{inspector}</td>
+              <td className="px-3 py-2.5 whitespace-nowrap"><StatusTag status={report.latest_status} /></td>
+              <td className="px-3 py-2.5 tabular-nums">{report.response_count}</td>
+              <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{formatDate(report.received_at)}</td>
+              <td className="px-3 py-2.5 text-right"><button className="btn-secondary text-xs py-1 px-3"
+                onClick={() => update({ report: report.msafe_report_id })}>View</button></td>
+            </tr>;
+          })}</tbody>
+        </table></div>}
+    </div>
 
     <div className="flex justify-between items-center mt-5 text-sm">
       <span className="text-ink-muted">{total} {total === 1 ? 'report' : 'reports'} · Page {page + 1} of {Math.max(1, Math.ceil(total / MSAFE_PAGE_SIZE))}</span>
@@ -149,6 +172,7 @@ export default function MsafeReportsPage() {
 
 function ReportDialog({ reportId, account, onClose }) {
   const admin = account.role === 'administrator';
+  const staff = useStaff();
   const dialog = useRef(null);
   const [report, setReport] = useState(null);
   const [responses, setResponses] = useState([]);
@@ -178,6 +202,7 @@ function ReportDialog({ reportId, account, onClose }) {
       ]);
       if (!r) throw new Error('Report not found.');
       setReport(r); setResponses(resp); setDrafts(dr); setHistory(hist);
+      setAssignTo(r.inspector_id ?? ''); // the current inspector is shown selected
     } catch (err) { setLoadError(err.message); }
   }
   useEffect(() => {
@@ -244,7 +269,9 @@ function ReportDialog({ reportId, account, onClose }) {
       {report && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-sunken border border-surface-line px-3 py-2">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <StatusTag status={report.latest_status} />
-          <span><span className="text-ink-muted">Inspector: </span>{report.inspector_name ?? 'Unassigned'}{assignedToMe && ' (you)'}</span>
+          <span><span className="text-ink-muted">Inspector: </span>{report.inspector_id ? staffLabel(staff, report.inspector_id, report.inspector_name) : 'Unassigned'}{assignedToMe && ' (you)'}</span>
+          {report.inspection_id && <span><span className="text-ink-muted">Inspection: </span>
+            <Link className="text-brand-700 underline font-mono text-xs" to={`/records/${encodeURIComponent(report.inspection_id)}`}>{report.inspection_id.length > 14 ? `${report.inspection_id.slice(0, 8)}…${report.inspection_id.slice(-4)}` : report.inspection_id}</Link></span>}
           <span><span className="text-ink-muted">Sent: </span>{responses.length}</span>
           {mine.length > 0 && <span><span className="text-ink-muted">Your drafts: </span>{mine.length}</span>}
         </div>
@@ -274,7 +301,15 @@ function ReportDialog({ reportId, account, onClose }) {
             : <button className="btn-secondary" onClick={() => setShowPhoto(true)}>Show photo</button>)}
         </section>
 
-        {!supplier && <section className="border-t border-surface-line pt-4 space-y-3">
+        <details className="border-t border-surface-line pt-4 group">
+          <summary className="cursor-pointer font-medium flex flex-wrap items-baseline gap-x-2">
+            {supplier ? 'Supplier details' : 'Purchase details'}
+            <span className="text-sm font-normal text-ink-muted">
+              {(supplier ? report.supplier_name : report.purchase_location) || 'Not given'}
+              {' · '}<span className="text-brand-700 group-open:hidden">Show more</span><span className="text-brand-700 hidden group-open:inline">Show less</span>
+            </span>
+          </summary>
+        {!supplier && <section className="pt-3 space-y-3">
           <h3 className="font-medium">Purchase</h3>
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <Field label="Store or market">{report.purchase_location}</Field>
@@ -286,7 +321,7 @@ function ReportDialog({ reportId, account, onClose }) {
           </dl>
         </section>}
 
-        {(supplier || report.supplier_name) && <section className="border-t border-surface-line pt-4 space-y-3">
+        {(supplier || report.supplier_name) && <section className="pt-3 space-y-3">
           <h3 className="font-medium">Supplier</h3>
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <Field label="Name">{report.supplier_name}</Field>
@@ -298,14 +333,16 @@ function ReportDialog({ reportId, account, onClose }) {
           </dl>
         </section>}
 
-        {report.additional_details && <section className="border-t border-surface-line pt-4 space-y-2">
+        {report.additional_details && <section className="pt-3 space-y-2">
           <h3 className="font-medium">Additional details</h3>
           <p className="text-sm whitespace-pre-wrap break-words">{report.additional_details}</p>
         </section>}
 
+        </details>
+
         <section ref={assignRef} className="border-t border-surface-line pt-4 space-y-3 scroll-mt-48">
           <h3 className="font-medium">Assigned inspector</h3>
-          <p className="text-sm">{report.inspector_name ?? 'Unassigned'}{assignedToMe && ' (you)'}</p>
+          <p className="text-sm">{report.inspector_id ? staffLabel(staff, report.inspector_id, report.inspector_name) : 'Unassigned'}{assignedToMe && ' (you)'}</p>
           {admin ? <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); act(() => assignMsafeReport(report, assignTo), 'Assignment saved.'); }}>
             <select aria-label="Assign inspector" className="input flex-1 min-w-0" value={assignTo} onChange={(e) => setAssignTo(e.target.value)} required disabled={busy}>
               <option value="">Choose an inspector</option>
@@ -317,6 +354,7 @@ function ReportDialog({ reportId, account, onClose }) {
 
         <section className="border-t border-surface-line pt-4 space-y-3">
           <h3 className="font-medium">Linked inspection</h3>
+          <p className="text-xs text-ink-muted">Linking uses this report's scan as the inspection's mobile result, so the gas and mobile results pair.</p>
           {report.inspection_id
             ? <Link className="text-brand-700 underline break-all" to={`/records/${encodeURIComponent(report.inspection_id)}`}>{report.inspection_id}</Link>
             : canRespond && report.inspector_id
@@ -395,14 +433,14 @@ function ReportDialog({ reportId, account, onClose }) {
         </form> : <p className="border-t border-surface-line pt-4 text-sm text-ink-muted">
           {report.inspector_id ? 'Only the assigned inspector or an administrator can respond to this report.' : 'Claim this report to respond.'}</p>}
 
-        {history.length > 0 && <section className="border-t border-surface-line pt-4 space-y-2">
-          <h3 className="font-medium">History</h3>
+        {history.length > 0 && <details className="border-t border-surface-line pt-4 space-y-2">
+          <summary className="cursor-pointer font-medium">History <span className="text-sm font-normal text-ink-muted">({history.length})</span></summary>
           <ul className="text-sm space-y-1">{history.map((e) => <li key={e.event_id}>
             <span className="text-ink-muted">{formatActivityTime(e.occurred_at)}</span> · {e.actor_name ?? 'Staff'} {EVENT_LABEL[e.action] ?? e.action}
             {(e.action === 'assigned' || e.action === 'reassigned') && e.inspector_name && ` ${e.inspector_name}`}
             {e.action === 'linked' && e.inspection_id && ` ${e.inspection_id}`}
           </li>)}</ul>
-        </section>}
+        </details>}
 
       </>}
     </div>
