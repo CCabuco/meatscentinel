@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       };
       // Recheck settings and current email after leasing, including opt-outs while queued.
       const [eligibility, account, settings] = await Promise.all([
-        db.rpc('notification_skip_reason', { p_recipient: item.recipient_id, p_category: item.category, p_scan: item.scan_id, p_event: item.event_type }),
+        db.rpc('notification_skip_reason', { p_recipient: item.recipient_id, p_category: item.category, p_scan: item.scan_id ?? item.msafe_report_id, p_event: item.event_type }),
         db.from('accounts').select('email').eq('id', item.recipient_id).single(),
         db.from('notification_settings').select('email_enabled').eq('id', true).single(),
       ]);
@@ -53,10 +53,12 @@ Deno.serve(async (req) => {
         await finish('pending', 'Delivery paused or recipient email changed before sending');
         continue;
       }
-      const path = item.inspection_id ? `/records/${encodeURIComponent(item.inspection_id)}` : '/customer-reports';
+      const path = item.inspection_id ? `/records/${encodeURIComponent(item.inspection_id)}` : '/msafe-reports';
       const link = new URL(path, base).href;
       const preferences = new URL('/notifications?tab=settings', base).href;
-      const reference = item.inspection_id ? `Inspection: ${item.inspection_id}` : `Mobile report: ${item.scan_id}`;
+      const reference = item.msafe_report_id
+        ? `MSafe report: ${item.msafe_report_id}${item.inspection_id ? ` (inspection ${item.inspection_id})` : ''}`
+        : item.inspection_id ? `Inspection: ${item.inspection_id}` : `Mobile report: ${item.scan_id}`;
       const text = `${item.title}\n\nHello ${item.recipient_name},\n\n${item.message}\n\n${reference}\nOpen: ${link}\n\nEmail preferences: ${preferences}\nYou received this because of your inspection assignment.`;
       let response: Response;
       try {
