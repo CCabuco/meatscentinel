@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import AccountsPage from './pages/AccountsPage.jsx';
 import ActivityLogPage from './pages/ActivityLogPage.jsx';
 import CustomerReportsPage from './pages/CustomerReportsPage.jsx';
+import MsafeReportsPage from './pages/MsafeReportsPage.jsx';
 import NotificationsPage from './pages/NotificationsPage.jsx';
 import { NotFoundPage } from './pages/Placeholders.jsx';
 
@@ -94,6 +95,9 @@ export default function App() {
 
       <Route path="/customer-reports" element={
         <RequireRole roles={['inspector', 'administrator']}><CustomerReportsPage /></RequireRole>
+      } />
+      <Route path="/msafe-reports" element={
+        <RequireRole roles={['inspector', 'administrator']}><MsafeReportsPage /></RequireRole>
       } />
       <Route path="/notifications" element={
         <RequireRole roles={['inspector', 'administrator']}><NotificationsPage /></RequireRole>
