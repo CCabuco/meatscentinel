@@ -10,7 +10,6 @@ import RecordDetailPage from './pages/RecordDetailPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import AccountsPage from './pages/AccountsPage.jsx';
 import ActivityLogPage from './pages/ActivityLogPage.jsx';
-import CustomerReportsPage from './pages/CustomerReportsPage.jsx';
 import MsafeReportsPage from './pages/MsafeReportsPage.jsx';
 import NotificationsPage from './pages/NotificationsPage.jsx';
 import { NotFoundPage } from './pages/Placeholders.jsx';
@@ -93,9 +92,8 @@ export default function App() {
         }
       />
 
-      <Route path="/customer-reports" element={
-        <RequireRole roles={['inspector', 'administrator']}><CustomerReportsPage /></RequireRole>
-      } />
+      {/* Old CheckMeat pull page, retired Nov 2026. Old links land on MSafe reports. */}
+      <Route path="/customer-reports" element={<Navigate to="/msafe-reports" replace />} />
       <Route path="/msafe-reports" element={
         <RequireRole roles={['inspector', 'administrator']}><MsafeReportsPage /></RequireRole>
       } />

@@ -76,7 +76,7 @@ function NotificationHistory({ admin }) {
           <p className="text-xs font-mono text-ink-muted mt-2 break-all">{item.inspection_id ?? `Mobile report: ${item.scan_id}`}</p>
           <div className="flex flex-wrap gap-3 items-center mt-3">
             <span className={`text-xs rounded-md px-2 py-1 ${['failed','unknown'].includes(item.status) ? 'bg-state-reviewBg text-state-review' : 'bg-surface-sunken text-ink-muted'}`}>{DELIVERY_LABELS[item.status]}</span>
-            <Link className="text-sm text-brand-700 underline" to={item.inspection_id ? `/records/${encodeURIComponent(item.inspection_id)}` : '/customer-reports'}>Open {item.inspection_id ? 'inspection' : 'reports'}</Link>
+            <Link className="text-sm text-brand-700 underline" to={item.inspection_id ? `/records/${encodeURIComponent(item.inspection_id)}` : '/msafe-reports'}>Open {item.inspection_id ? 'inspection' : 'reports'}</Link>
             {!admin && !item.read_at && <button className="btn-secondary" disabled={busy !== null} onClick={() => action(item, false)}>Mark as read</button>}
             {admin && item.status === 'failed' && <button className="btn-secondary" disabled={busy !== null} onClick={() => action(item, true)}>Retry email</button>}
             {admin && item.status === 'unknown' && <button className="btn-secondary" disabled={busy !== null} onClick={() => setUncertain(item.id)}>Review retry</button>}

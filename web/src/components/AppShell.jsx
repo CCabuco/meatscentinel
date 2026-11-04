@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const INSPECTOR_LINKS = [
-  { to: '/customer-reports', label: 'Customer Reports' },
   { to: '/msafe-reports', label: 'MSafe reports' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/records', label: 'Inspection records' },
@@ -12,7 +11,6 @@ const INSPECTOR_LINKS = [
 ];
 
 const ADMINISTRATOR_LINKS = [
-  { to: '/customer-reports', label: 'Customer Reports' },
   { to: '/msafe-reports', label: 'MSafe reports' },
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/records', label: 'Inspection records' },
