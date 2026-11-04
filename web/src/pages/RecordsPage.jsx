@@ -9,6 +9,7 @@ import { useStaff, staffLabel } from '../lib/staff.js';
 import { formatDate, titleCaseSample } from '../lib/format.js';
 import {
   listRecords,
+  claimInspection,
   pairingLabel,
   pairingShort,
   PAGE_SIZE,
@@ -66,6 +67,7 @@ export default function RecordsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   // silent: refresh in place (auto refresh) without the loading state.
   const sequence = useRef(0);
@@ -166,13 +168,22 @@ export default function RecordsPage() {
         )}
 
         {error && <div className="p-5"><div className="alert-error">{error}</div></div>}
+        {notice && (
+          <p role="status" className={`${notice.tone === 'error' ? 'alert-error' : 'alert-success'} m-4`}>{notice.text}</p>
+        )}
 
         {loading ? (
           <p className="p-8 text-sm text-ink-faint text-center">Loading records…</p>
         ) : records.length === 0 ? (
           <EmptyState hasFilters={chips.length > 0 || Boolean(filters.q) || tab !== 'all'} />
         ) : (
-          <RecordTable records={records} staff={staff} />
+          <RecordTable records={records} staff={staff}
+            canClaim={account.role === 'inspector'}
+            onClaim={async (id) => {
+              const { error: claimError } = await claimInspection(id);
+              setNotice(claimError ? { tone: 'error', text: claimError } : { tone: 'success', text: 'Claimed. It is now assigned to you.' });
+              load({ silent: true });
+            }} />
         )}
 
         <Pagination
@@ -212,8 +223,9 @@ function TabBar({ tab, onSelect }) {
 
 // One line per record. Gas readings and the image result are on the record
 // page; the list shows only what is needed to decide what to open.
-function RecordTable({ records, staff }) {
+function RecordTable({ records, staff, canClaim, onClaim }) {
   const navigate = useNavigate();
+  const [claiming, setClaiming] = useState(null);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[720px]">
@@ -239,7 +251,7 @@ function RecordTable({ records, staff }) {
             return (
               <tr
                 key={row.inspection_id}
-                onClick={(e) => { if (!e.target.closest('a')) navigate(href); }}
+                onClick={(e) => { if (!e.target.closest('a, button')) navigate(href); }}
                 className="border-b border-surface-line last:border-0 hover:bg-surface-sunken/60 cursor-pointer"
               >
                 <Td><InspectionId value={row.inspection_id} /></Td>
@@ -251,7 +263,13 @@ function RecordTable({ records, staff }) {
                   <span className={row.assignment ? 'text-ink' : 'text-ink-faint'}>{inspector}</span>
                 </Td>
                 <Td className="text-ink-muted">{formatDate(row.created_at)}</Td>
-                <Td className="text-right">
+                <Td className="text-right space-x-2">
+                  {canClaim && !row.assignment && (
+                    <button type="button" className="btn-primary text-xs py-1 px-3" disabled={claiming !== null}
+                      onClick={async () => { setClaiming(row.inspection_id); await onClaim(row.inspection_id); setClaiming(null); }}>
+                      {claiming === row.inspection_id ? 'Claiming…' : 'Claim'}
+                    </button>
+                  )}
                   <Link to={href} className="btn-secondary text-xs py-1 px-3">View</Link>
                 </Td>
               </tr>

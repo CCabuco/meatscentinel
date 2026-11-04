@@ -13,6 +13,7 @@ import { listActiveInspectors } from '../lib/msafe.js';
 import { useStaff, staffLabel } from '../lib/staff.js';
 import {
   assignInspection,
+  claimInspection,
   pairingLabel,
   getRecord,
   getTimeline,
@@ -177,6 +178,7 @@ export default function RecordDetailPage() {
             record={record}
             staff={staff}
             admin={account.role === 'administrator'}
+            accountId={account.id}
             onAssigned={(message) => {
               setFeedback({ tone: 'success', message });
               load({ silent: true });
@@ -318,7 +320,7 @@ function SummaryBar({ record, currentStatus, staff }) {
   );
 }
 
-function AssignmentPanel({ record, staff, admin, onAssigned, onError }) {
+function AssignmentPanel({ record, staff, admin, accountId, onAssigned, onError }) {
   const [inspectors, setInspectors] = useState(null);
   const [choice, setChoice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -351,6 +353,14 @@ function AssignmentPanel({ record, staff, admin, onAssigned, onError }) {
       : 'The inspector was unassigned and will be emailed.');
   }
 
+  async function claim() {
+    setBusy(true);
+    const { error } = await claimInspection(record.inspection_id);
+    setBusy(false);
+    if (error) { onError(error); return; }
+    onAssigned('You claimed this inspection. You will get emails when its results or status change.');
+  }
+
   return (
     <section className="card p-5">
       <h2 className="mb-1">Assigned inspector</h2>
@@ -359,11 +369,24 @@ function AssignmentPanel({ record, staff, admin, onAssigned, onError }) {
       </p>
       <p className="text-xs text-ink-faint mb-4">
         {direct
-          ? `Assigned by ${assignment.assigned_by_name ?? 'an administrator'} · ${formatDateTime(assignment.assigned_at)}`
+          ? `${assignment.assigned_by === assignment.inspector_id ? 'Claimed' : `Assigned by ${assignment.assigned_by_name ?? 'an administrator'}`} · ${formatDateTime(assignment.assigned_at)}`
           : assignment?.source === 'msafe'
             ? 'Through the linked MSafe report.'
             : assignment ? 'Through a linked mobile report (CheckMeat, retired).' : 'No inspector is responsible for this record yet.'}
       </p>
+      {!admin && !direct && (
+        <div className="space-y-2">
+          <button className="btn-primary" disabled={busy} onClick={claim}>
+            {busy ? 'Claiming…' : 'Claim this inspection'}
+          </button>
+          <p className="text-xs text-ink-faint">
+            You become the assigned inspector. Only an administrator can reassign it afterwards.
+          </p>
+        </div>
+      )}
+      {!admin && direct && assignment.inspector_id === accountId && (
+        <p className="text-xs text-ink-muted">This inspection is assigned to you.</p>
+      )}
       {admin && (
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (choice) save(choice); }}>
           <div>

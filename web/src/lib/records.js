@@ -97,7 +97,7 @@ async function withAssignments(records) {
   const ids = records.map((record) => record.inspection_id);
   const [direct, legacy, msafe] = await Promise.all([
     supabase.from('inspection_assignments_view')
-      .select('inspection_id,inspector_id,inspector_name,assigned_by_name,assigned_at')
+      .select('inspection_id,inspector_id,inspector_name,assigned_by,assigned_by_name,assigned_at')
       .in('inspection_id', ids),
     supabase.from('customer_report_assignments')
       .select('inspection_id,scan_id,inspector_id,inspector_name,inspector_user_id')
@@ -137,6 +137,12 @@ export function pairingLabel(record) {
   if (record.has_gas_submission) return 'Waiting for mobile result';
   if (record.has_image_submission) return 'Waiting for gas reading';
   return 'No submissions yet';
+}
+
+// Inspectors only (enforced in the database): take an unassigned inspection.
+export async function claimInspection(inspectionId) {
+  const { error } = await supabase.rpc('claim_inspection', { p_inspection_id: inspectionId });
+  return { error: error?.message ?? null };
 }
 
 // Administrators only (enforced in the database). Pass null to unassign.

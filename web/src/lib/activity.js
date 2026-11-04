@@ -14,6 +14,7 @@ export const ACTIVITY_ACTIONS = {
   image_viewed: 'Viewed image',
   inspection_assigned: 'Assigned to inspection',
   inspection_unassigned: 'Removed from inspection',
+  inspection_claimed: 'Claimed inspection',
   msafe_claimed: 'Claimed MSafe report',
   msafe_assigned: 'Assigned MSafe report',
   msafe_linked: 'Linked MSafe report to inspection',
@@ -74,7 +75,7 @@ export function activityDetail(entry) {
       ? ` · ${details.before ?? 'Unassigned'} → ${details.after ?? 'Unassigned'}` : '';
     return `Mobile scan ${details.scan_id ?? ''}${assignment}`;
   }
-  if (entry.action === 'inspection_assigned' || entry.action === 'inspection_unassigned') {
+  if (['inspection_assigned', 'inspection_unassigned', 'inspection_claimed'].includes(entry.action)) {
     return `${details.before ?? 'Unassigned'} → ${details.after ?? 'Unassigned'}`;
   }
   if (entry.action.startsWith('msafe_')) {
