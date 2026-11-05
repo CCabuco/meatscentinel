@@ -111,6 +111,14 @@ class MeatSentinelApp(App):
         if self.simulation:
             self.device_id = "simulator"
             self.log.warning("SIMULATION MODE: no ESP32. Uploads are labelled SIM- / device 'simulator'.")
+        # ESP32_BASE_URL in .env overrides esp32.base_url, so each machine can
+        # point at its own ESP32 address without editing the shared config.json.
+        esp32_url = os.getenv("ESP32_BASE_URL", "").strip()
+        if esp32_url:
+            if not esp32_url.startswith(("http://", "https://")):
+                esp32_url = "http://" + esp32_url
+            self.config["esp32"]["base_url"] = esp32_url
+        self.log.info("ESP32 address: %s", self.config["esp32"]["base_url"])
         self.esp32 = build_esp32_controller(self.config["esp32"], simulate=self.simulation)
 
         # Local storage (Module 1.4 persistence, Module 5.3 offline queue)
