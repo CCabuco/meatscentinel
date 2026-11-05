@@ -223,14 +223,13 @@ export async function requestPasswordRecovery(userId) {
 // trigger on auth.users. The local token is cleared here so this browser
 // does not keep presenting one the server has already revoked.
 export async function changePassword(email, currentPassword, newPassword) {
-  const { error: reauthError } = await supabase.auth.signInWithPassword({
-    email,
-    password: currentPassword,
+  // Checked on the server so the verified session is kept (see
+  // requestEmailChange).
+  const { data: ok, error: checkError } = await supabase.rpc('verify_my_password', {
+    p_password: currentPassword,
   });
-
-  if (reauthError) {
-    return { error: 'Your current password is not correct.' };
-  }
+  if (checkError) return { error: checkError.message };
+  if (!ok) return { error: 'Your current password is not correct.' };
 
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) {
@@ -241,7 +240,7 @@ export async function changePassword(email, currentPassword, newPassword) {
   return { error: null };
 }
 
-const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 
 export function validateEmail(email) {
   const value = (email ?? '').trim();
@@ -251,7 +250,7 @@ export function validateEmail(email) {
   if (/[\s<>"';()\\]/.test(value)) {
     return 'That email address contains characters that are not allowed.';
   }
-  if (!EMAIL_PATTERN.test(value)) {
+  if (!EMAIL_PATTERN.test(value) || /\.\.|^\.|\.@/.test(value)) {
     return 'Enter a valid email address, for example name@example.com.';
   }
   return null;
@@ -266,19 +265,20 @@ export function validateEmail(email) {
 // a sign-in. The current-password requirement (D-07) matters more with
 // LV in place, not less.
 export async function requestEmailChange(currentEmail, currentPassword, newEmail) {
-  const value = (newEmail ?? '').trim();
+  const value = (newEmail ?? '').trim().toLowerCase();
 
   const formatError = validateEmail(value);
   if (formatError) return { error: formatError };
 
-  const { error: reauthError } = await supabase.auth.signInWithPassword({
-    email: currentEmail,
-    password: currentPassword,
+  // Checked on the server inside the session you already verified. Signing
+  // in again to check the password started a new, unverified session and
+  // signed you out of the portal halfway through the change.
+  const { data: problem, error: checkError } = await supabase.rpc('prepare_email_change', {
+    p_password: currentPassword,
+    p_new_email: value,
   });
-
-  if (reauthError) {
-    return { error: 'Your current password is not correct.' };
-  }
+  if (checkError) return { error: checkError.message };
+  if (problem) return { error: problem };
 
   const { error } = await supabase.auth.updateUser(
     { email: value },
@@ -287,12 +287,15 @@ export async function requestEmailChange(currentEmail, currentPassword, newEmail
 
   if (error) {
     if (/already been registered|already exists|already in use/i.test(error.message)) {
-      return { error: 'That email address is already registered to another account.' };
+      return { error: 'That email address is already used by another account.' };
+    }
+    if (/rate|too many|seconds/i.test(error.message)) {
+      return { error: 'An email was sent recently. Wait a minute and try again.' };
     }
     return { error: error.message };
   }
 
-  return { error: null };
+  return { error: null, email: value };
 }
 
 export async function getPendingEmail() {

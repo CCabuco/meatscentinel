@@ -189,6 +189,8 @@ function RecoveryEmail({ account }) {
   const [pending, setPending] = useState(null);
   const [editing, setEditing] = useState(false);
   const [email, setEmail] = useState('');
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [touched, setTouched] = useState(false);
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -209,11 +211,14 @@ function RecoveryEmail({ account }) {
   const trimmed = email.trim();
   const formatError = trimmed ? validateEmail(trimmed) : null;
   const sameAsCurrent = trimmed.toLowerCase() === account.email.toLowerCase();
-  const canSave =
-    trimmed && !formatError && !sameAsCurrent && password.length > 0;
+  const mismatch = confirmEmail.trim() !== '' && confirmEmail.trim().toLowerCase() !== trimmed.toLowerCase();
+  const canSave = trimmed && !formatError && !sameAsCurrent && !mismatch
+    && confirmEmail.trim() !== '' && password.length > 0;
 
   function startEditing() {
     setEmail('');
+    setConfirmEmail('');
+    setTouched(false);
     setPassword('');
     setStatus(null);
     setEditing(true);
@@ -222,6 +227,7 @@ function RecoveryEmail({ account }) {
   function cancelEditing() {
     setEditing(false);
     setEmail('');
+    setConfirmEmail('');
     setPassword('');
     setStatus(null);
   }
@@ -231,7 +237,7 @@ function RecoveryEmail({ account }) {
     setBusy(true);
     setStatus(null);
 
-    const { error } = await requestEmailChange(account.email, password, trimmed);
+    const { error, email: requested } = await requestEmailChange(account.email, password, trimmed);
     setBusy(false);
 
     if (error) {
@@ -239,13 +245,13 @@ function RecoveryEmail({ account }) {
       return;
     }
 
-    setPending(trimmed);
+    setPending(requested ?? trimmed.toLowerCase());
     setEditing(false);
     setPassword('');
     setCooldown(60);
     setStatus({
       tone: 'success',
-      message: `A confirmation link has been sent to ${trimmed}.`,
+      message: `Confirmation email sent. Open the link in ${trimmed.toLowerCase()} within 24 hours. If ${account.email} also receives a link, open that one too: the change only happens after every link is opened.`,
     });
   }
 
@@ -273,10 +279,10 @@ function RecoveryEmail({ account }) {
       setStatus({ tone: 'error', message: error });
       return;
     }
-    setPending(null);
+    setPending(await getPendingEmail());
     setStatus({
       tone: 'success',
-      message: 'Email change cancelled. Your current address is unchanged.',
+      message: 'Email change cancelled. Links already sent no longer work, and your current address is unchanged.',
     });
   }
 
@@ -324,7 +330,9 @@ function RecoveryEmail({ account }) {
               </p>
               <p className="text-sm text-state-review mt-1">
                 A link was sent to {pending}. Your address changes once it is
-                opened. Until then, reset emails go to {account.email}.
+                opened (and the link sent to {account.email}, if you received
+                one). Until then, sign-in codes and reset emails still go to {account.email}.
+                Open the link in the same browser if you can; you will be asked to sign in again afterwards.
               </p>
             </div>
             <div className="flex gap-2">
@@ -360,16 +368,41 @@ function RecoveryEmail({ account }) {
                 className="input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setTouched(true)}
                 autoFocus
                 required
+                maxLength={254}
+                autoComplete="email"
+                aria-invalid={Boolean(touched && (formatError || sameAsCurrent))}
               />
-              {formatError && (
+              {touched && formatError && (
                 <p className="text-xs text-state-spoiled mt-1.5">{formatError}</p>
               )}
               {sameAsCurrent && trimmed && (
                 <p className="text-xs text-state-spoiled mt-1.5">
                   That is already your current address.
                 </p>
+              )}
+            </div>
+
+            <div>
+              <label className="label" htmlFor="confirmNewEmail">
+                Type the new email again
+              </label>
+              <input
+                id="confirmNewEmail"
+                type="email"
+                className="input"
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+                onPaste={(e) => e.preventDefault()}
+                required
+                maxLength={254}
+                autoComplete="off"
+                aria-invalid={mismatch}
+              />
+              {mismatch && (
+                <p className="text-xs text-state-spoiled mt-1.5">The two email addresses do not match.</p>
               )}
             </div>
 
